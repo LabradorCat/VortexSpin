@@ -7,7 +7,7 @@ import matplotlib.animation as manimation
 plt.rcParams['animation.ffmpeg_path'] = r'E:\ASI_MSci_Project\ffmpeg-2021-11-07-git-45dc668aea-full_build\bin\ffmpeg.exe'
 
 
-class ASI_RPM():
+class ASVI():
     '''
     Class for initialising the lattice be performing field sweeps, mainly
     return point memory
