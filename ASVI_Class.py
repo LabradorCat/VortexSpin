@@ -4,7 +4,7 @@ import copy
 import os
 import scipy.interpolate as spi
 import matplotlib.animation as manimation
-plt.rcParams['animation.ffmpeg_path'] = r'E:\ASI_MSci_Project\ffmpeg-2021-11-07-git-45dc668aea-full_build\bin\ffmpeg.exe'
+plt.rcParams['animation.ffmpeg_path'] = r'E:\ASI_MSci_Project\ffmpeg\bin\ffmpeg.exe'
 
 
 class ASVI():
@@ -99,6 +99,22 @@ class ASVI():
        The lattice is stored as a numpy array [x_position, y_position, z_position,
        x_magnetisation, y_magnetisation, z_magnetisation, coercive field,
        flip_count, vertex or not]
+       
+            INDEX       PROPERTIES
+            0           x_pos
+            1           y_pos
+            2           z_pos
+            3           x_mag
+            4           y_mag
+            5           z_mag
+            6           Hc
+            7           bar_length
+            8           bar_width
+            9           bar_thickness
+            10          vertex Charge (0 for vertices, None for others)
+            11          is Vortex (0 for dipolar nanobars, 1 for vortices, None for vertices)
+            12          flip_count
+            13          vortex_count           
        '''
     def square(self, Hc_mean=0.03, Hc_std=0.05):
         '''
@@ -113,28 +129,23 @@ class ASVI():
         self.Hc_std = Hc_std
         self.side_len_x = 2 * self.unit_cells_x + 1
         self.side_len_y = 2 * self.unit_cells_y + 1
-        grid = np.zeros((2 * self.unit_cells_x + 1, 2 * self.unit_cells_y + 1, 9))
-        for x in range(0, 2 * self.unit_cells_x + 1):
-            for y in range(0, 2 * self.unit_cells_y + 1):
+        bar_l, bar_w, bar_t = self.bar_length, self.bar_width, self.bar_thickness
+        grid = np.zeros((self.side_len_x, self.side_len_y, 14))
+        for x in range(0, self.side_len_x):
+            for y in range(0, self.side_len_y):
+                xpos = x * self.unit_cell_len
+                ypos = y * self.unit_cell_len
                 if (x + y) % 2 != 0:
+                    Hc = np.random.normal(loc=Hc_mean, scale=Hc_std * Hc_mean, size=None)
                     if y % 2 == 0:
-                        xpos = x * (self.bar_length + self.vertex_gap) / 2
-                        ypos = y * (self.bar_length + self.vertex_gap) / 2
-                        grid[x, y] = np.array([x * self.unit_cell_len, y * self.unit_cell_len, 0., 1., 0., 0.,
-                                               np.random.normal(loc=Hc_mean, scale=Hc_std * Hc_mean, size=None), 0,
-                                               None])
+                        grid[x, y] = np.array([xpos, ypos, 0., 1., 0., 0., Hc, bar_l, bar_w, bar_t, None, 0, 0, 0])
                     else:
-                        grid[x, y] = np.array([x * self.unit_cell_len, y * self.unit_cell_len, 0., 0., 1., 0.,
-                                               np.random.normal(loc=Hc_mean, scale=Hc_std * Hc_mean, size=None), 0,
-                                               None])
+                        grid[x, y] = np.array([xpos, ypos, 0., 0., 1., 0., Hc, bar_l, bar_w, bar_t, None, 0, 0, 0])
                 else:
                     if (x) % 2 == 0 and x != 0 and y != 0 and x != self.side_len_x - 1 and y != self.side_len_x - 1:
-                        # print('test')
-                        grid[x, y] = np.array([x * self.unit_cell_len, y * self.unit_cell_len, 0., 0., 0., 0., 0, 0, 0])
+                        grid[x, y] = np.array([xpos, ypos, 0., 0., 0., 0., 0., None, None, None, 0, None, 0, 0])
                     else:
-                        grid[x, y] = np.array(
-                            [x * self.unit_cell_len, y * self.unit_cell_len, 0., 0., 0., 0., 0, 0, None])
-        print(grid)
+                        grid[x, y] = np.array([xpos, ypos, 0., 0., 0., 0., 0., None, None, None, None, None, 0, 0])
         self.lattice = grid
 
     '''
@@ -182,15 +193,14 @@ class ASVI():
         idx = np.append(idx, idx[-1] + 1)
         print(Hc_array)
         field_steps = field_steps / angleFactor
-        q = []
-        mag = []
-        monopole = []
-        fieldloops = []
-        vertex = []
+
+        q, mag, monopole, fieldloops, vertex, counter = ([] for i in range(6))
         counter = 0
-        period = None
         i = 0
+        period = None
+
         self.relax(n=n)
+
         tcycles = 15
         if folder == None:
             self.save(
@@ -256,18 +266,9 @@ class ASVI():
         grid = copy.deepcopy(self.lattice)
         unrelaxed = True
         Happlied[Happlied == -0.] = 0.
-        #Xpos = np.random.permutation(grid[:,:, 0].flatten()).tolist()
-        #Ypos = np.random.permutation(grid[:,:, 1].flatten()).tolist()
-        #print(Xpos, r'\n', Ypos)
         Xpos, Ypos = np.where(grid[:,:,6] != 0)
         positions = np.array(list(zip(Xpos, Ypos)))
-        #print(positions)
-        #Xpos = np.random.permutation(Xpos)
-        #Ypos = np.random.permutation(Ypos)
-        #print(Xpos, Ypos.tolist())
-        #positions = np.random.permutation(positions)
-        #print(positions)
-        #time.sleep(20)
+
         total_flipcount = 0
         while unrelaxed == True:
             flipcount = 0
@@ -279,27 +280,24 @@ class ASVI():
                 y = pos[1]
                 if abs(grid[x,y,6]) != 0:
                     unit_vector = grid[x,y,3:6]
-                    field = np.dot(np.array(Happlied+self.Hlocal(x,y, n=n)), unit_vector)
+                    field = np.dot(np.array(Happlied + self.Hlocal(x,y, n=n)), unit_vector)
                     #print(field)
                     if field < -grid[x,y,6]:
-                        vortex_prob = np.random.randint(0,100)
-                        if vortex_prob <= 10:
-                            grid[x,y,3:9] = 0
+                        if np.random.random() <= self.vortex_prob(x, y, n):
+                            grid[x,y,3:6] = 0
+                            grid[x,y,11] = 1
+                            grid[x,y,13] += 1
                             vortexcount += 1
                             print('Vortex loc', x, y)
                         else:
-                            #print(grid[x,y,3:5])
                             grid[x,y,3:5] = np.negative(grid[x,y,3:5])
-                        #print(grid[x,y,3:5])
                             grid[x,y,:][grid[x,y,:] == 0.] = 0.
-                            grid[x,y,7] += 1
+                            grid[x,y,12] += 1
                             flipcount += 1
-                            #print(grid[x,y,3:5])
                             print('Flip loc', x, y)
-                        #positions_new = np.append(positions_new, [[x+2, y],[x, y+2],[x-2, y],[x, y-2]])
                 else:
                     print('wrong spin')
-            print("no of flipped spins in relax", flipcount)
+            print("number of flipped spins in relax = ", flipcount)
             grid[grid == -0.] = 0.
             if flipcount > 0:
                 unrelaxed = True
@@ -307,9 +305,9 @@ class ASVI():
                 unrelaxed = False
             self.lattice = grid
             total_flipcount+=flipcount
-        print(total_flipcount)
+        # print(total_flipcount)
 
-    def fieldSweepAnimation2(self, folder, name='Lattice_counter'):
+    def fieldSweepAnimation(self, folder, name='Lattice_counter'):
         '''
         Will produce an animation of the lattice as it goes through the field sweep
         just provide the folder where the field sweeps are saved
@@ -346,16 +344,21 @@ class ASVI():
                     self.clearLattice()
                     self.load(os.path.join(root, file))
                     self.vertexCharge()
+
                     grid = self.lattice
+
                     X = grid[:, :, 0].flatten()
                     Y = grid[:, :, 1].flatten()
-                    z = grid[:, :, 2].flatten()
+                    Z = grid[:, :, 2].flatten()
                     Mx = grid[:, :, 3].flatten()
                     My = grid[:, :, 4].flatten()
                     Mz = grid[:, :, 5].flatten()
                     Hc = grid[:, :, 6].flatten()
-                    C = grid[:, :, 7].flatten()
-                    MagCharge = grid[:, :, 8].flatten()
+                    bar_l = grid[:, :, 7].flatten()
+                    bar_w = grid[:, :, 8].flatten()
+                    bar_t = grid[:, :, 9].flatten()
+                    Cv = grid[:, :, 10].flatten()
+
                     # print(MagCharge)
 
                     # fig = plt.figure(figsize=(6,6), num = 'test')
@@ -370,7 +373,7 @@ class ASVI():
                     ax.quiver(X, Y, Mx, My, angles='xy', scale_units='xy', pivot='mid', zorder=1)
                     # quiver.set_clim(self, 0, 2)
                     # scatter with colormap mapping to z value
-                    ax.scatter(X, Y, s=50, c=MagCharge, cmap='gist_rainbow', marker='o', zorder=2, vmax=1, vmin=-1)
+                    ax.scatter(X, Y, s=50, c=Cv, cmap='gist_rainbow', marker='o', zorder=2, vmax=1, vmin=-1)
 
                     # cb2 = fig.colorbar(graph, fraction=0.046, pad=0.04, ax = ax)
                     # ax.set(adjustable='box', aspect='equal')
@@ -393,6 +396,29 @@ class ASVI():
     '''
         Basic Calculations
     '''
+    def vortex_prob(self, x, y, n=1):
+        x1 = x - n
+        x2 = x + n + 1
+        y1 = y - n
+        y2 = y + n + 1
+
+        if x1 < 0:
+            x1 = 0
+        if x2 > self.side_len_x:
+            x2 = self.side_len_x
+        if y1 < 0:
+            y1 = 0
+        if y2 > self.side_len_y :
+            y2 = self.side_len_y
+
+        grid = self.lattice
+        unique, count = np.unique(grid[x1:x2, y1:y2, 11], return_counts=True)
+        if 1 in unique:
+            vortex_prob = 0.01 * np.exp(count[1]) + 0.1
+        else:
+            vortex_prob = 0.01 * np.exp(1) + 0.1
+        return vortex_prob
+
     def correlation(self, lattice1, lattice2):
         '''
         Returns the correlation between lattice1 and lattice2
@@ -408,9 +434,6 @@ class ASVI():
                     if np.array_equal(l1[x,y, 3:6], l2[x,y,3:6]) ==True:
                         same+=1.0
                     total +=1.0
-        #print("Same total:",same)
-        #print("Absolute total:", total)
-        #print('Correlation factor:',same/total)
         return(same/total)
 
     def netMagnetisation(self):
@@ -427,12 +450,12 @@ class ASVI():
         '''
         Returns the monopole density of a square or kagome lattice
         '''
-        #4in/0out have a charge of 1
-        #3in/1out have a charge of 0.5
-        #The density is then calculated by dividing by the total area minus the edges
+        # 4in/0out have a charge of 1
+        # 3in/1out have a charge of 0.5
+        #   The density is then calculated by dividing by the total area minus the edges
         self.vertexCharge()
         grid = self.lattice
-        magcharge = grid[:,:,8].flatten()
+        magcharge = grid[:,:,10].flatten()
         return(np.nanmean(np.absolute(magcharge)))
 
     def Hlocal(self, x, y, n=1):
@@ -516,7 +539,7 @@ class ASVI():
         grid = copy.deepcopy(self.lattice)
         for x in np.arange(0, self.side_len_x):
             for y in np.arange(0, self.side_len_y):
-                if np.isnan(grid[x, y, 8]) != True:
+                if np.isnan(grid[x, y, 10]) != True:
                     x1 = x - 1
                     x2 = x + 2
                     y1 = y - 1
@@ -562,7 +585,7 @@ class ASVI():
                         else:
                             charge = 0
 
-                    grid[x, y, 8] = charge
+                    grid[x, y, 10] = charge
 
         self.lattice = grid
 
