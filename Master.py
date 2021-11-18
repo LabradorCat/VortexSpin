@@ -66,6 +66,6 @@ if os.path.exists(folder) == False:
     os.mkdir(folder)
 
 lattice.fieldSweepAdaptive(Hmax=0.07, steps=10, Htheta=46, n=10, loops=1, folder=folder, q1=False)
-lattice.fieldSweepAnimation2(folder, name='Lattice_counter')
+lattice.fieldSweepAnimation(folder, name='Lattice_counter')
 
 
