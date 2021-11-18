@@ -350,13 +350,13 @@ class ASVI():
                     X = grid[:, :, 0].flatten()
                     Y = grid[:, :, 1].flatten()
                     Z = grid[:, :, 2].flatten()
-                    Mx = grid[:, :, 3].flatten()
-                    My = grid[:, :, 4].flatten()
-                    Mz = grid[:, :, 5].flatten()
-                    Hc = grid[:, :, 6].flatten()
                     bar_l = grid[:, :, 7].flatten()
-                    bar_w = grid[:, :, 8].flatten()
+                    bar_w = (grid[:, :, 8].flatten()) / 80e-9
                     bar_t = grid[:, :, 9].flatten()
+                    Mx = (grid[:, :, 3].flatten()) * bar_l
+                    My = grid[:, :, 4].flatten() * bar_l
+                    Mz = grid[:, :, 5].flatten() * bar_l
+                    Hc = grid[:, :, 6].flatten()
                     Cv = grid[:, :, 10].flatten()
 
                     # print(MagCharge)
@@ -370,11 +370,11 @@ class ASVI():
                     # ax.set_ylabel("YAVG",fontsize=12)
                     # ax.grid(True,linestyle='-',color='0.75')
 
-                    ax.quiver(X, Y, Mx, My, angles='xy', scale_units='xy', pivot='mid', zorder=1)
+                    ax.quiver(X, Y, Mx, My, angles='xy', scale_units='xy', scale=1, pivot='mid', zorder=1,
+                              linewidths = bar_w, edgecolors = 'k')
                     # quiver.set_clim(self, 0, 2)
                     # scatter with colormap mapping to z value
                     ax.scatter(X, Y, s=50, c=Cv, cmap='gist_rainbow', marker='o', zorder=2, vmax=1, vmin=-1)
-
                     # cb2 = fig.colorbar(graph, fraction=0.046, pad=0.04, ax = ax)
                     # ax.set(adjustable='box', aspect='equal')
                     plt.ticklabel_format(style='sci', scilimits=(0, 0))
