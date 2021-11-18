@@ -332,7 +332,7 @@ class ASVI():
             total_flipcount+=flipcount
         print(total_flipcount)
 
-    def fieldSweepAnimation2(self, folder, name='Lattice_counter'):
+    def fieldSweepAnimation(self, folder, name='Lattice_counter'):
         '''
         Will produce an animation of the lattice as it goes through the field sweep
         just provide the folder where the field sweeps are saved
