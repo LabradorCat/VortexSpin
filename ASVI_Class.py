@@ -87,6 +87,8 @@ class ASVI():
             self.Hc_std = np.float(parameters[11])
         self.lattice = npzfile['arr_0']
 
+    def get_bar_length(self, x, y):
+        return (self.lattice[x, y, 8])
     '''
        These are the functions that define the lattice type and
        position of each of the bars:
@@ -147,6 +149,22 @@ class ASVI():
                     else:
                         grid[x, y] = np.array([xpos, ypos, 0., 0., 0., 0., 0., None, None, None, None, None, 0, 0])
         self.lattice = grid
+
+    def square_staircase(self, Hc_mean=0.03, Hc_std=0.05, thick_bar_w=80e-9):
+        self.square(Hc_mean, Hc_std)
+        lattice = copy.deepcopy(self.lattice)
+        bar_w = lattice[:, :, 8]
+        for x in range(0, self.side_len_x):
+            for y in range(0, self.side_len_y):
+                if x % 4 == 0 and y % 4 == 1:
+                    bar_w[x, y] = thick_bar_w
+                elif x % 4 == 2 and y % 4 == 3:
+                    bar_w[x, y] = thick_bar_w
+                elif x % 4 == 1 and y % 4 == 2:
+                    bar_w[x, y] = thick_bar_w
+                elif x % 4 == 3 and y % 4 == 0:
+                    bar_w[x, y] = thick_bar_w
+        self.lattice[:, :, 8] = bar_w
 
     '''
         These are simulation executables
@@ -283,7 +301,7 @@ class ASVI():
                     field = np.dot(np.array(Happlied + self.Hlocal(x,y, n=n)), unit_vector)
                     #print(field)
                     if field < -grid[x,y,6]:
-                        if np.random.random() <= self.vortex_prob(x, y, n):
+                        if np.random.random() <= self.vortex_prob(x, y):
                             grid[x,y,3:6] = 0
                             grid[x,y,11] = 1
                             grid[x,y,13] += 1
@@ -336,10 +354,6 @@ class ASVI():
                 new_files = list(filter(lambda x: 'Lattice_counter' in x, files))
                 new_files.sort(key=sortFunc)
                 for file in new_files:
-                    # print(file)
-
-                    # plt.clf()
-                    # fig.clear()
                     ax.clear()
                     self.clearLattice()
                     self.load(os.path.join(root, file))
@@ -351,7 +365,7 @@ class ASVI():
                     Y = grid[:, :, 1].flatten()
                     Z = grid[:, :, 2].flatten()
                     bar_l = grid[:, :, 7].flatten()
-                    bar_w = (grid[:, :, 8].flatten()) / 80e-9
+                    bar_w = (grid[:, :, 8].flatten())
                     bar_t = grid[:, :, 9].flatten()
                     Mx = (grid[:, :, 3].flatten()) * bar_l
                     My = grid[:, :, 4].flatten() * bar_l
@@ -359,8 +373,15 @@ class ASVI():
                     Hc = grid[:, :, 6].flatten()
                     Cv = grid[:, :, 10].flatten()
 
-                    # print(MagCharge)
-
+                    line_w = []
+                    line_rbg = []
+                    for w in bar_w:
+                        if w > 100e-9:
+                            line_w.append(4)
+                            line_rbg.append((0,0,0))
+                        else:
+                            line_w.append(1)
+                            line_rbg.append((0,0,0))
                     # fig = plt.figure(figsize=(6,6), num = 'test')
                     # ax = fig.add_subplot(111)
                     ax.set_xlim([-1 * self.unit_cell_len, np.max(X) + self.unit_cell_len])
@@ -371,7 +392,7 @@ class ASVI():
                     # ax.grid(True,linestyle='-',color='0.75')
 
                     ax.quiver(X, Y, Mx, My, angles='xy', scale_units='xy', scale=1, pivot='mid', zorder=1,
-                              linewidths = bar_w, edgecolors = 'k')
+                              linewidths = line_w, color = line_rbg, edgecolors = 'k')
                     # quiver.set_clim(self, 0, 2)
                     # scatter with colormap mapping to z value
                     ax.scatter(X, Y, s=50, c=Cv, cmap='gist_rainbow', marker='o', zorder=2, vmax=1, vmin=-1)
@@ -396,12 +417,12 @@ class ASVI():
     '''
         Basic Calculations
     '''
-    def vortex_prob(self, x, y, n=1):
-        x1 = x - n
-        x2 = x + n + 1
-        y1 = y - n
-        y2 = y + n + 1
 
+    def vortex_prob(self, x, y, v_n=2):
+        x1 = x - v_n
+        x2 = x + v_n + 1
+        y1 = y - v_n
+        y2 = y + v_n + 1
         if x1 < 0:
             x1 = 0
         if x2 > self.side_len_x:
@@ -413,10 +434,17 @@ class ASVI():
 
         grid = self.lattice
         unique, count = np.unique(grid[x1:x2, y1:y2, 11], return_counts=True)
-        if 1 in unique:
-            vortex_prob = 0.01 * np.exp(count[1]) + 0.1
+
+        min_width = 100e-9
+        bar_length = self.get_bar_length(x, y)
+
+        if bar_length < min_width:
+            vortex_prob = 0
         else:
-            vortex_prob = 0.01 * np.exp(1) + 0.1
+            if 1 in unique:
+                vortex_prob = 0.01 * np.exp(count[1]) + 0.05
+            else:
+                vortex_prob = 0.01 * np.exp(1) + 0.05
         return vortex_prob
 
     def correlation(self, lattice1, lattice2):
