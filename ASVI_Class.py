@@ -20,15 +20,15 @@ class ASVI():
         self.Hc = None
         self.Hc_std = None
         self.previous = None
+        self.applied_field = None
         self.unit_cells_x = unit_cells_x
         self.unit_cells_y = unit_cells_y
         self.side_len_x = None      #The side length is now defined in the square lattice
         self.side_len_y = None
-        self.bar_length = bar_length
         self.vertex_gap = vertex_gap
+        self.bar_length = bar_length
         self.bar_width = bar_width
         self.bar_thickness = bar_thickness
-        self.width = bar_width
         self.magnetisation = magnetisation
         self.periodicBC = False
         self.unit_cell_len = (bar_length+vertex_gap)/2
@@ -53,10 +53,10 @@ class ASVI():
         if folder == None:
             folder = os.getcwd()
         file = file.replace('.','p')
-        parameters = np.array([self.unit_cells_x,self.unit_cells_y,\
-            self.bar_length,self.vertex_gap,self.bar_width,\
-            self.bar_thickness,self.magnetisation, self.side_len_x, self.side_len_y, self.type,\
-            self.Hc, self.Hc_std])
+        parameters = np.array([self.unit_cells_x, self.unit_cells_y, self.vertex_gap,
+                               self.bar_length,self.bar_width,self.bar_thickness,self.magnetisation,
+                               self.side_len_x, self.side_len_y, self.type, self.applied_field,
+                               self.Hc, self.Hc_std])
         np.savez_compressed(os.path.join(folder,file), self.lattice, parameters)
 
     def load(self, file):
@@ -73,21 +73,22 @@ class ASVI():
         #print(len(parameters))
         self.unit_cells_x = np.int(parameters[0])
         self.unit_cells_y = np.int(parameters[1])
-        self.bar_length = np.float(parameters[2])
-        self.vertex_gap = np.float(parameters[3])
+        self.vertex_gap = np.float(parameters[2])
+        self.bar_length = np.float(parameters[3])
         self.bar_width = np.float(parameters[4])
         self.bar_thickness = np.float(parameters[5])
         self.magnetisation = np.float(parameters[6])
         self.side_len_x = np.int(parameters[7])
         self.side_len_y = np.int(parameters[8])
         self.type = parameters[9]
+        self.applied_field = np.float(parameters[10])
         #print(self.type)
-        if len(parameters) > 10:
-            self.Hc = np.float(parameters[10])
-            self.Hc_std = np.float(parameters[11])
+        if len(parameters) > 11:
+            self.Hc = np.float(parameters[11])
+            self.Hc_std = np.float(parameters[12])
         self.lattice = npzfile['arr_0']
 
-    def get_bar_length(self, x, y):
+    def get_bar_width(self, x, y):
         return (self.lattice[x, y, 8])
     '''
        These are the functions that define the lattice type and
@@ -150,21 +151,29 @@ class ASVI():
                         grid[x, y] = np.array([xpos, ypos, 0., 0., 0., 0., 0., None, None, None, None, None, 0, 0])
         self.lattice = grid
 
-    def square_staircase(self, Hc_mean=0.03, Hc_std=0.05, thick_bar_w=80e-9):
-        self.square(Hc_mean, Hc_std)
+    def square_staircase(self, Hc_thin = 0.03, Hc_thick = 0.015, Hc_std = 0.05,
+                         thick_bar_w = 80e-9):
+        self.square(Hc_thin, Hc_std)
         lattice = copy.deepcopy(self.lattice)
         bar_w = lattice[:, :, 8]
+        Hc = lattice[:, :, 6]
         for x in range(0, self.side_len_x):
             for y in range(0, self.side_len_y):
+                Hc_new = np.random.normal(loc=Hc_thick, scale=Hc_std * Hc_thick, size=None)
                 if x % 4 == 0 and y % 4 == 1:
                     bar_w[x, y] = thick_bar_w
+                    Hc[x, y] = Hc_new
                 elif x % 4 == 2 and y % 4 == 3:
                     bar_w[x, y] = thick_bar_w
+                    Hc[x, y] = Hc_new
                 elif x % 4 == 1 and y % 4 == 2:
                     bar_w[x, y] = thick_bar_w
+                    Hc[x, y] = Hc_new
                 elif x % 4 == 3 and y % 4 == 0:
                     bar_w[x, y] = thick_bar_w
+                    Hc[x, y] = Hc_new
         self.lattice[:, :, 8] = bar_w
+        self.lattice[:, :, 6] = Hc
 
     '''
         These are simulation executables
@@ -199,13 +208,7 @@ class ASVI():
         idx = np.round(np.linspace(0, len(field_steps) - 1, steps)).astype(int)
         field_steps = field_steps[idx]
         field_steps = np.append(field_steps, Hmax)
-        # plt.figure()
-        # print(Hc_array.size, Hc_new.size, field_steps.size)
 
-        # plt.plot(np.linspace(0,4, Hc_array.size),Hc_array,'o-')
-        # plt.plot(np.linspace(0,4,1000),Hc_new)
-        # plt.plot(np.linspace(0,1, field_steps.size),field_steps, '.')
-        # plt.show()
         field_neg = -1 * field_steps
         field_steps = np.append(field_steps, field_neg)
         idx = np.append(idx, idx[-1] + 1)
@@ -275,12 +278,107 @@ class ASVI():
         else:
             np.savez(os.path.join(folder, file), parameters, fieldloops, q, mag, monopole, vertex)
 
+    def fieldSweepSine(self, Hmax, steps, Htheta, n=10, loops=1, folder=None, q1=False):
+        '''
+        Sweeps through from zero to Hmax at angle Htheta following a Sine function in steps.
+        Total number of steps for a full minor loop is 12*step.
+        The function then performs loops number of minor loops
+        The Lattice after each field step gets saved to a folder. if folder is None then the
+        function saves the lattice to the current working directory
+        '''
+        if folder == None:
+            folder = os.getcwd()
+
+        testLattice = copy.deepcopy(self.lattice)
+        Htheta = np.pi * Htheta / 180
+        testLattice[testLattice[:, :, 6] == 0] = np.nan
+        if np.sin(Htheta) == 0:
+            angleFactor = np.cos(Htheta)
+        else:
+            angleFactor = np.sin(Htheta)
+
+        field_steps = Hmax*np.sin(np.linspace(0, 2*np.pi, 4*(steps)))
+        field_steps = np.repeat(field_steps, 3)
+        field_steps = field_steps / angleFactor
+
+        q, mag, monopole, fieldloops, vertex, counter = ([] for i in range(6))
+        counter = 0
+        i = 0
+        period = None
+
+        self.relax(n=n)
+
+        tcycles = 0
+
+        if folder == None:
+            self.save(
+                'InitialRPMLattice_Hmax%(Hmax)e_steps%(steps)d_Angle%(Htheta)e_neighbours%(n)d_Loops%(loops)d' % locals(),
+                folder=folder)
+        else:
+            if not os.path.exists(folder):
+                os.makedirs(folder)
+            self.save(
+                'InitialRPMLattice_Hmax%(Hmax)e_steps%(steps)d_Angle%(Htheta)e_neighbours%(n)d_Loops%(loops)d' % locals(),
+                folder=folder)
+
+        while i <= loops:
+            self.previous = copy.deepcopy(self)
+            for field in field_steps:
+                self.applied_field = field
+                Happlied = field * np.array([np.cos(Htheta), np.sin(Htheta), 0.])
+
+                print('Calculating loop ', i, ' with Happlied =', Happlied)
+                print('......')
+
+                self.relax(Happlied, n)
+                fieldloops.append(np.array([i, field]))
+                mag.append(self.netMagnetisation())
+                monopole.append(self.monopoleDensity())
+                q.append(self.correlation(self.previous, self))
+                # vertex.append(self.vertexTypePercentage())
+                if not os.path.exists(folder):
+                    os.makedirs(folder)
+                self.save('Lattice_counter%(counter)d_Loop%(i)d_FieldApplied%(field)e_Angle%(Htheta)e' % locals(),
+                          folder=folder)
+                counter += 1
+
+            if q1 == True and period == None:
+                finalfield = abs(field)
+                namestr = '%(finalfield)e_A'% locals()
+                print(namestr)
+                period = self.determinePeriod2(folder, Hmax = namestr.replace('.', 'p'))
+                print('period:', period)
+                if period != None:
+                    loops = i + period
+                    tcycles=i
+            i += 1
+            print('Done !')
+
+        self.save('FinalRPMLattice_Hmax%(Hmax)e_steps%(steps)d_Angle%(Htheta)e_neighbours%(n)d_Loops%(loops)d' % locals(),folder=folder)
+        fieldloops = np.array(fieldloops)
+        q = np.array(q)
+        mag = np.array(mag)
+        monopole = np.array(monopole)
+        vertex = np.array(vertex)
+        file = 'RPMStateInfo_Hmax%(Hmax)e_steps%(steps)d_Angle%(Htheta)e_neighbours%(n)d_Loops%(loops)d' % locals()
+        parameters = np.array([Hmax, steps, Htheta, n, loops, self.Hc, self.Hc_std, period, tcycles])
+        print(parameters)
+
+        if folder == None:
+            folder = os.getcwd()
+            np.savez(os.path.join(folder, file), parameters, fieldloops, q, mag, monopole, vertex)
+        else:
+            np.savez(os.path.join(folder, file), parameters, fieldloops, q, mag, monopole, vertex)
+
     def relax(self, Happlied = np.array([0.,0.,0.]), n=10):
         '''
         Steps through all the the positions in the lattice and if the field applied along the direction
         of the bar is negative and greater than the coercive field then it switches the magnetisation
         of the bar
         '''
+        Hc_vortex = 0.020
+        Hc_std = 0.05
+
         grid = copy.deepcopy(self.lattice)
         unrelaxed = True
         Happlied[Happlied == -0.] = 0.
@@ -303,6 +401,7 @@ class ASVI():
                     if field < -grid[x,y,6]:
                         if np.random.random() <= self.vortex_prob(x, y):
                             grid[x,y,3:6] = 0
+                            grid[x,y,6] = np.random.normal(loc=Hc_vortex, scale=Hc_std*Hc_vortex, size=None)
                             grid[x,y,11] = 1
                             grid[x,y,13] += 1
                             vortexcount += 1
@@ -333,7 +432,7 @@ class ASVI():
         FFMpegWriter = manimation.writers['ffmpeg']
         metadata = dict(title='Movie Test', artist='Matplotlib',
                         comment='a red circle following a blue sine wave')
-        writer = FFMpegWriter(fps=15, metadata=metadata)
+        writer = FFMpegWriter(fps=5, metadata=metadata)
         fig, ax = plt.subplots()
         # n = len(df['number'])
         ims = []
@@ -360,6 +459,7 @@ class ASVI():
                     self.vertexCharge()
 
                     grid = self.lattice
+                    H_applied = np.round(1000*self.applied_field, 2)
 
                     X = grid[:, :, 0].flatten()
                     Y = grid[:, :, 1].flatten()
@@ -373,15 +473,19 @@ class ASVI():
                     Hc = grid[:, :, 6].flatten()
                     Cv = grid[:, :, 10].flatten()
 
+                    #sorting our colors and thicknesses
                     line_w = []
                     line_rbg = []
                     for w in bar_w:
                         if w > 100e-9:
                             line_w.append(4)
-                            line_rbg.append((0,0,0))
                         else:
                             line_w.append(1)
-                            line_rbg.append((0,0,0))
+                    for i in range(len(Mx)):
+                        if Mx[i] > 0 or My[i] > 0:
+                            line_rbg.append((1,0,0))
+                        else:
+                            line_rbg.append((0,0,1))
                     # fig = plt.figure(figsize=(6,6), num = 'test')
                     # ax = fig.add_subplot(111)
                     ax.set_xlim([-1 * self.unit_cell_len, np.max(X) + self.unit_cell_len])
@@ -392,7 +496,7 @@ class ASVI():
                     # ax.grid(True,linestyle='-',color='0.75')
 
                     ax.quiver(X, Y, Mx, My, angles='xy', scale_units='xy', scale=1, pivot='mid', zorder=1,
-                              linewidths = line_w, color = line_rbg, edgecolors = 'k')
+                              linewidths = line_w, color = line_rbg, edgecolors = line_rbg)
                     # quiver.set_clim(self, 0, 2)
                     # scatter with colormap mapping to z value
                     ax.scatter(X, Y, s=50, c=Cv, cmap='gist_rainbow', marker='o', zorder=2, vmax=1, vmin=-1)
@@ -401,7 +505,8 @@ class ASVI():
                     plt.ticklabel_format(style='sci', scilimits=(0, 0))
                     plt.tight_layout()
 
-                    ax.set_title(file[file.find('counter') + 7:file.find(r'_Loop')])
+                    ax.set_title("Steps: " + file[file.find('counter') + 7:file.find(r'_Loop')], loc = 'left')
+                    ax.set_title('Applied Field: ' + str(H_applied) + 'mT, Field Angle = 45 deg', loc = 'right')
                     # print(file.find('counter'),file.find(r'_Loop'))
                     # print(counter)
                     # plt.show()
@@ -436,9 +541,9 @@ class ASVI():
         unique, count = np.unique(grid[x1:x2, y1:y2, 11], return_counts=True)
 
         min_width = 100e-9
-        bar_length = self.get_bar_length(x, y)
+        bar_width = self.get_bar_width(x, y)
 
-        if bar_length < min_width:
+        if bar_width <= min_width:
             vortex_prob = 0
         else:
             if 1 in unique:
