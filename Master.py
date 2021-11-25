@@ -23,17 +23,22 @@ reload(asvi)
 #-----------------------------------------------------------------------------------------------------------------------
 # Material Parameters
 
-size = 5  ## Dimension of array
+size = 2  ## Dimension of array
 
-Hc = 0.062  # Coercive Field (T)
+Hc_thin = 0.025  # Coercive Field (T)
+Hc_thick = 0.018
+
 Hc_std = 5  # Stanard deviation in the coercive field (as a percentage)
 bar_length = 400e-9  # Bar length in m
 vertex_gap = 100e-9  # Vertex gap in m
 bar_thickness = 20.5e-9  # Bar thickness in m
-bar_width = 80e-9  # Bar width in m
+
+thin_bar_width = 100e-9  # Bar width in m
+thick_bar_width = 200e-9
+
 magnetisation = 800e3  # Saturation magnetisation of material in A/m (permalloy is 80e3)
 field_angle = 45.  # Angle at which the field will be applied in degrees
-field_max = 0.95 * Hc / np.cos(field_angle / 180 * np.pi)  # Maximum field to by applied at field angle measured in Telsa
+field_max = 0.95 * Hc_thin / np.cos(field_angle / 180 * np.pi)  # Maximum field to by applied at field angle measured in Telsa
 magnetisation = 800e3  # Saturation magnetisation of material in A/m (permalloy is 80e3)
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -44,14 +49,14 @@ Hsteps = 5  # Number of steps between the minimum value of the coercive field
             # and the maxium field specified above. Total number of steps in a
             # minor loop is = 4*(steps+1)
 neighbours = 10  # The radius of neighbouring spins that are included in the local field calculation
-loops = 5  # The number of minor field loops to be done
+loops = 2  # The number of minor field loops to be done
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Generate ASCI Class model
 
-lattice = asvi.ASVI(size, size, bar_length = bar_length, bar_width = bar_width, bar_thickness = bar_thickness,
+lattice = asvi.ASVI(size, size, bar_length = bar_length, bar_width = thin_bar_width, bar_thickness = bar_thickness,
                     vertex_gap=vertex_gap, magnetisation=magnetisation)
-lattice.square_staircase(Hc, Hc_std / 100, 200e-9)  # Specify whether it is a square or kagome lattice
+lattice.square_staircase(Hc_thin, Hc_thick, Hc_std / 100, thick_bar_width)  # Specify whether it is a square or kagome lattice
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Running Simulation and output results
@@ -63,7 +68,7 @@ folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir, output_folder_name
 if os.path.exists(folder) == False:
     os.mkdir(folder)
 
-lattice.fieldSweepAdaptive(Hmax = field_max, steps = Hsteps, Htheta = field_angle,
+lattice.fieldSweepSine(Hmax = field_max, steps = Hsteps, Htheta = field_angle,
                            n = neighbours, loops = loops, folder = folder, q1 = False)
 lattice.fieldSweepAnimation(folder, name='Lattice_counter')
 
