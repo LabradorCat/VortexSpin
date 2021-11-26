@@ -12,8 +12,8 @@ class ASVI():
     Class for initialising the lattice be performing field sweeps, mainly
     return point memory
     '''
-    def __init__(self, unit_cells_x=25, unit_cells_y=25, lattice = None, \
-        bar_length = 220e-9, vertex_gap = 1e-7, bar_thickness = 25e-9, \
+    def __init__(self, unit_cells_x=25, unit_cells_y=25, lattice = None,
+        bar_length = 220e-9, vertex_gap = 1e-7, bar_thickness = 25e-9,
         bar_width = 80e-9, magnetisation = 800e3):
         self.lattice = lattice
         self.type = None
@@ -94,15 +94,9 @@ class ASVI():
        These are the functions that define the lattice type and
        position of each of the bars:
            - Square
-           - Tilted square
-           - Kagome
-           - Short shakti
-           - Long shakti
-           - Tetris
-       The lattice is stored as a numpy array [x_position, y_position, z_position,
-       x_magnetisation, y_magnetisation, z_magnetisation, coercive field,
-       flip_count, vertex or not]
-       
+           - Staircase Thin-Thick square
+           
+       The lattice is stored as a numpy array obeying the following index table
             INDEX       PROPERTIES
             0           x_pos
             1           y_pos
@@ -151,8 +145,7 @@ class ASVI():
                         grid[x, y] = np.array([xpos, ypos, 0., 0., 0., 0., 0., None, None, None, None, None, 0, 0])
         self.lattice = grid
 
-    def square_staircase(self, Hc_thin = 0.03, Hc_thick = 0.015, Hc_std = 0.05,
-                         thick_bar_w = 80e-9):
+    def square_staircase(self, Hc_thin = 0.03, Hc_thick = 0.015, Hc_std = 0.05, thick_bar_w = 80e-9):
         self.square(Hc_thin, Hc_std)
         lattice = copy.deepcopy(self.lattice)
         bar_w = lattice[:, :, 8]
@@ -297,8 +290,7 @@ class ASVI():
         else:
             angleFactor = np.sin(Htheta)
 
-        field_steps = Hmax*np.sin(np.linspace(0, 2*np.pi, 4*(steps)))
-        field_steps = np.repeat(field_steps, 3)
+        field_steps = Hmax*np.sin(np.linspace(0, 2*np.pi, 12*(steps)))
         field_steps = field_steps / angleFactor
 
         q, mag, monopole, fieldloops, vertex, counter = ([] for i in range(6))
@@ -327,7 +319,7 @@ class ASVI():
                 self.applied_field = field
                 Happlied = field * np.array([np.cos(Htheta), np.sin(Htheta), 0.])
 
-                print('Calculating loop ', i, ' with Happlied =', Happlied)
+                print('Calculating loop ', i, ' step ', counter, ' with Happlied =', Happlied)
                 print('......')
 
                 self.relax(Happlied, n)
@@ -352,7 +344,6 @@ class ASVI():
                     loops = i + period
                     tcycles=i
             i += 1
-            print('Done !')
 
         self.save('FinalRPMLattice_Hmax%(Hmax)e_steps%(steps)d_Angle%(Htheta)e_neighbours%(n)d_Loops%(loops)d' % locals(),folder=folder)
         fieldloops = np.array(fieldloops)
