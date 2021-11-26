@@ -48,7 +48,7 @@ magnetisation = 800e3  # Saturation magnetisation of material in A/m (permalloy 
 Hsteps = 5  # Number of steps between the minimum value of the coercive field
             # and the maxium field specified above. Total number of steps in a
             # minor loop is = 4*(steps+1)
-neighbours = 10  # The radius of neighbouring spins that are included in the local field calculation
+neighbours = 1  # The radius of neighbouring spins that are included in the local field calculation
 loops = 2  # The number of minor field loops to be done
 
 #-----------------------------------------------------------------------------------------------------------------------
