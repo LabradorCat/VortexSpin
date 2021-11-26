@@ -21,6 +21,7 @@ class ASVI():
         self.Hc_std = None
         self.previous = None
         self.applied_field = None
+        self.field_angle = None
         self.unit_cells_x = unit_cells_x
         self.unit_cells_y = unit_cells_y
         self.side_len_x = None      #The side length is now defined in the square lattice
@@ -55,7 +56,7 @@ class ASVI():
         file = file.replace('.','p')
         parameters = np.array([self.unit_cells_x, self.unit_cells_y, self.vertex_gap,
                                self.bar_length,self.bar_width,self.bar_thickness,self.magnetisation,
-                               self.side_len_x, self.side_len_y, self.type, self.applied_field,
+                               self.side_len_x, self.side_len_y, self.type, self.applied_field, self.field_angle,
                                self.Hc, self.Hc_std])
         np.savez_compressed(os.path.join(folder,file), self.lattice, parameters)
 
@@ -66,11 +67,7 @@ class ASVI():
         if '.npz' not in file:
             file = file+'.npz'
         npzfile = np.load(file)
-        #print(npzfile)
-        #print(npzfile.files)
-        #print(npzfile.f.arr_1)
         parameters = npzfile['arr_1']
-        #print(len(parameters))
         self.unit_cells_x = np.int(parameters[0])
         self.unit_cells_y = np.int(parameters[1])
         self.vertex_gap = np.float(parameters[2])
@@ -82,10 +79,11 @@ class ASVI():
         self.side_len_y = np.int(parameters[8])
         self.type = parameters[9]
         self.applied_field = np.float(parameters[10])
+        self.field_angle = np.float(parameters[11])
         #print(self.type)
-        if len(parameters) > 11:
-            self.Hc = np.float(parameters[11])
-            self.Hc_std = np.float(parameters[12])
+        if len(parameters) > 12:
+            self.Hc = np.float(parameters[12])
+            self.Hc_std = np.float(parameters[13])
         self.lattice = npzfile['arr_0']
 
     def get_bar_width(self, x, y):
@@ -248,7 +246,7 @@ class ASVI():
                 finalfield = abs(field)
                 namestr = '%(finalfield)e_A'% locals()
                 print(namestr)
-                period = self.determinePeriod2(folder, Hmax = namestr.replace('.', 'p'))
+                period = self.determinePeriod(folder, Hmax = namestr.replace('.', 'p'))
                 print('period:', period)
                 if period != None:
                     loops = i + period
@@ -282,6 +280,7 @@ class ASVI():
         if folder == None:
             folder = os.getcwd()
 
+        self.field_angle = Htheta
         testLattice = copy.deepcopy(self.lattice)
         Htheta = np.pi * Htheta / 180
         testLattice[testLattice[:, :, 6] == 0] = np.nan
@@ -338,7 +337,7 @@ class ASVI():
                 finalfield = abs(field)
                 namestr = '%(finalfield)e_A'% locals()
                 print(namestr)
-                period = self.determinePeriod2(folder, Hmax = namestr.replace('.', 'p'))
+                period = self.determinePeriod(folder, Hmax = namestr.replace('.', 'p'))
                 print('period:', period)
                 if period != None:
                     loops = i + period
@@ -451,6 +450,7 @@ class ASVI():
 
                     grid = self.lattice
                     H_applied = np.round(1000*self.applied_field, 2)
+                    H_theta = self.field_angle
 
                     X = grid[:, :, 0].flatten()
                     Y = grid[:, :, 1].flatten()
@@ -475,8 +475,10 @@ class ASVI():
                     for i in range(len(Mx)):
                         if Mx[i] > 0 or My[i] > 0:
                             line_rbg.append((1,0,0))
-                        else:
+                        elif Mx[i] < 0 or My[i] < 0:
                             line_rbg.append((0,0,1))
+                        else:
+                            line_rbg.append((0,0,0))
                     # fig = plt.figure(figsize=(6,6), num = 'test')
                     # ax = fig.add_subplot(111)
                     ax.set_xlim([-1 * self.unit_cell_len, np.max(X) + self.unit_cell_len])
@@ -497,7 +499,8 @@ class ASVI():
                     plt.tight_layout()
 
                     ax.set_title("Steps: " + file[file.find('counter') + 7:file.find(r'_Loop')], loc = 'left')
-                    ax.set_title('Applied Field: ' + str(H_applied) + 'mT, Field Angle = 45 deg', loc = 'right')
+                    ax.set_title('Applied Field: {} mT, Field Angle = {} deg'.format(H_applied, H_theta),
+                                 loc = 'right')
                     # print(file.find('counter'),file.find(r'_Loop'))
                     # print(counter)
                     # plt.show()
@@ -525,22 +528,26 @@ class ASVI():
             x2 = self.side_len_x
         if y1 < 0:
             y1 = 0
-        if y2 > self.side_len_y :
+        if y2 > self.side_len_y:
             y2 = self.side_len_y
 
         grid = self.lattice
         unique, count = np.unique(grid[x1:x2, y1:y2, 11], return_counts=True)
-
         min_width = 100e-9
-        bar_width = self.get_bar_width(x, y)
+        bar_length = self.get_bar_width(x, y)
+        vortex_prob = 0
 
-        if bar_width <= min_width:
-            vortex_prob = 0
-        else:
-            if 1 in unique:
-                vortex_prob = 0.01 * np.exp(count[1]) + 0.05
+        if bar_length > min_width:     # thin bar below min_width cannot form vortex
+            if self.applied_field < 0:
+                    if 1 in unique:
+                        vortex_prob = 0.01*count[1] + 0.0305    # slightly more likely for vortex to from beside vortices
+                    else:
+                        vortex_prob = 0.0305
             else:
-                vortex_prob = 0.01 * np.exp(1) + 0.05
+                    if 1 in unique:
+                        vortex_prob = 0.01*np.exp(count[1]) + 0.0134
+                    else:
+                        vortex_prob = 0.0134
         return vortex_prob
 
     def correlation(self, lattice1, lattice2):
@@ -747,7 +754,7 @@ class ASVI():
             B = 1e-7 * mag_charge * (r1 / np.linalg.norm(r1) ** 3 - r2 / np.linalg.norm(r2) ** 3)
             return (B)
 
-    def determinePeriod2(self, folder, Hmax = '1p414214e-01_Angle'):
+    def determinePeriod(self, folder, Hmax ='1p414214e-01_Angle'):
         '''
         Determines the period in the minor loop.
         '''
