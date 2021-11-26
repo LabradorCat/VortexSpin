@@ -23,7 +23,7 @@ reload(asvi)
 #-----------------------------------------------------------------------------------------------------------------------
 # Material Parameters
 
-size = 2  ## Dimension of array
+size = 5  ## Dimension of array
 
 Hc_thin = 0.025  # Coercive Field (T)
 Hc_thick = 0.018
