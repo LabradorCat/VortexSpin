@@ -24,7 +24,7 @@ reload(asvi)
 # Material & Lattice Parameters
 # Define the size of the lattice and material properties
 
-size = 2  ## Dimension of array
+size = 10  ## Dimension of array
 
 Hc_thin = 0.025  # Coercive Field (T)
 Hc_thick = 0.018
@@ -49,7 +49,7 @@ Hsteps = 10         # Number of steps between the minimum value of the coercive 
                     # and the maxium field specified above. Total number of steps in a
                     # minor loop is = (2*steps)
 neighbours = 1      # The radius of neighbouring spins that are included in the local field calculation
-loops = 2           # The number of minor field loops to be done
+loops = 10           # The number of minor field loops to be done
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Generate ASCI Class model

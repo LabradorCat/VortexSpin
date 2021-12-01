@@ -238,9 +238,7 @@ class ASVI():
             for field in field_steps:
                 self.applied_field = field
                 Happlied = field * np.array([np.cos(Htheta), np.sin(Htheta), 0.])
-
                 print('Calculating loop ', i, ' step ', counter, ' with Happlied =', Happlied)
-                print('......')
 
                 self.relax(Happlied, n)
                 fieldloops.append(np.array([i, field]))
@@ -345,19 +343,15 @@ class ASVI():
         metadata = dict(title='Movie Test', artist='Matplotlib',
                         comment='a red circle following a blue sine wave')
         writer = FFMpegWriter(fps=5, metadata=metadata)
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(8,8))
         # n = len(df['number'])
         ims = []
         counter = []
         fig_anim = plt.figure('Animation')
 
         def sortFunc(element):
-            # print(element)
             begin = element.find('counter') + 7
             end = element.find('_Loop')
-            # print(element.find('counter'))
-            # print(element.find('_Loop'))
-            # print(int(element[begin:end]))
             return (int(element[begin:end]))
 
         with writer.saving(fig, (os.path.join(folder, "animation.mp4")), 100):
@@ -386,7 +380,7 @@ class ASVI():
                     Hc = grid[:, :, 6].flatten()
                     Cv = grid[:, :, 10].flatten()
 
-                    #sorting our colors and thicknesses
+                    #sorting out colors and thicknesses
                     line_w = []
                     line_rbg = []
                     for w in bar_w:
@@ -418,11 +412,12 @@ class ASVI():
                     # cb2 = fig.colorbar(graph, fraction=0.046, pad=0.04, ax = ax)
                     # ax.set(adjustable='box', aspect='equal')
                     plt.ticklabel_format(style='sci', scilimits=(0, 0))
-                    plt.tight_layout()
+                    #plt.tight_layout()
 
-                    ax.set_title("Steps: " + file[file.find('counter') + 7:file.find(r'_Loop')], loc = 'left')
+                    ax.set_title("Steps: " + file[file.find('counter') + 7:file.find(r'_Loop')],
+                                 loc = 'left', pad = 20)
                     ax.set_title('Applied Field: {} mT, Field Angle = {} deg'.format(H_applied, H_theta),
-                                 loc = 'right')
+                                 loc = 'right', pad = 20)
                     # print(file.find('counter'),file.find(r'_Loop'))
                     # print(counter)
                     # plt.show()
@@ -461,15 +456,15 @@ class ASVI():
         vortex_prob = 0
         if bar_width > min_width:     # thin bar below min_width cannot form vortex
             if self.applied_field < 0:
-                    if 1 in unique:
-                        vortex_prob = 0.01*count[1] + 0.0305    # slightly more likely for vortex to from beside vortices
-                    else:
-                        vortex_prob = 0.0305
+                if 1 in unique:
+                    vortex_prob = 0.01*count[1] + 0.0305    # slightly more likely for vortex to from beside vortices
+                else:
+                    vortex_prob = 0.0305
             else:
-                    if 1 in unique:
-                        vortex_prob = 0.01*count[1] + 0.0134
-                    else:
-                        vortex_prob = 0.0134
+                if 1 in unique:
+                    vortex_prob = 0.01*count[1] + 0.0134
+                else:
+                    vortex_prob = 0.0134
         return vortex_prob
 
     def correlation(self, lattice1, lattice2):
