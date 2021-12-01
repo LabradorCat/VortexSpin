@@ -169,139 +169,60 @@ class ASVI():
     '''
         These are simulation executables
     '''
-    def fieldSweepAdaptive(self, Hmax, steps, Htheta, n=10, loops=1, folder=None, q1=False):
+    def AdaptiveField(self, Hmax, steps):
         '''
-        Sweeps through from 90% of the minimum Coercive field to Hmax at angle Htheta in steps.
-        Total number of steps for a full minor loop is 4*(step+1).
-        The function then performs loops number of minor loops
-        The Lattice after each field step gets saved to a folder. if folder is None then the
-        function saves the lattice to the current working directory
+        Sweeps through minimum Coercive field to Hmax, go from positive to negative
+        (2 * steps) field values in a period
         '''
-        if folder == None:
-            folder = os.getcwd()
-        M0 = copy.deepcopy(self)
         testLattice = copy.deepcopy(self.lattice)
-        Htheta = np.pi * Htheta / 180
         testLattice[testLattice[:, :, 6] == 0] = np.nan
-        if np.sin(Htheta) == 0:
-            angleFactor = np.cos(Htheta)
-        else:
-            angleFactor = np.sin(Htheta)
-        Hc_min = np.nanmin(testLattice[:, :, 6]) / angleFactor
-        Hc_array = testLattice[:, :, 6].flatten()
-        Hc_array = np.append(Hc_array, Hmax)
-        Hc_array.sort()
 
-        Hc_func = spi.interp1d(np.linspace(0, 1, Hc_array.size), Hc_array)
-        Hc_new = Hc_func(np.linspace(0, 1, 1000))
+        Hc_min = np.nanmin(testLattice[:, :, 6])
+        field_steps = np.linspace(Hc_min, Hmax, steps)
+        field_steps = np.append(field_steps, np.negative(field_steps))
+        return field_steps
 
-        field_steps = Hc_new[np.where(Hc_new <= Hmax)]
-        idx = np.round(np.linspace(0, len(field_steps) - 1, steps)).astype(int)
-        field_steps = field_steps[idx]
-        field_steps = np.append(field_steps, Hmax)
-
-        field_neg = -1 * field_steps
-        field_steps = np.append(field_steps, field_neg)
-        idx = np.append(idx, idx[-1] + 1)
-        print(Hc_array)
-        field_steps = field_steps / angleFactor
-
-        q, mag, monopole, fieldloops, vertex, counter = ([] for i in range(6))
-        counter = 0
-        i = 0
-        period = None
-
-        self.relax(n=n)
-
-        tcycles = 15
-        if folder == None:
-            self.save(
-                'InitialRPMLattice_Hmax%(Hmax)e_steps%(steps)d_Angle%(Htheta)e_neighbours%(n)d_Loops%(loops)d' % locals(),
-                folder=folder)
-        else:
-            if not os.path.exists(folder):
-                os.makedirs(folder)
-            self.save(
-                'InitialRPMLattice_Hmax%(Hmax)e_steps%(steps)d_Angle%(Htheta)e_neighbours%(n)d_Loops%(loops)d' % locals(),
-                folder=folder)
-        while i <= loops:
-            self.previous = copy.deepcopy(self)
-            for field in field_steps:
-                Happlied = field * np.array([np.cos(Htheta), np.sin(Htheta), 0.])
-                print('Happlied: ', Happlied)
-                print()
-                self.relax(Happlied, n)
-                fieldloops.append(np.array([i, field]))
-                mag.append(self.netMagnetisation())
-                monopole.append(self.monopoleDensity())
-                q.append(self.correlation(self.previous, self))
-                # vertex.append(self.vertexTypePercentage())
-                if not os.path.exists(folder):
-                    os.makedirs(folder)
-                self.save('Lattice_counter%(counter)d_Loop%(i)d_FieldApplied%(field)e_Angle%(Htheta)e' % locals(),
-                          folder=folder)
-                counter += 1
-
-            if q1 == True and period == None:
-                finalfield = abs(field)
-                namestr = '%(finalfield)e_A'% locals()
-                print(namestr)
-                period = self.determinePeriod(folder, Hmax = namestr.replace('.', 'p'))
-                print('period:', period)
-                if period != None:
-                    loops = i + period
-                    tcycles=i
-            i += 1
-            print(i,loops, period)
-
-        self.save('FinalRPMLattice_Hmax%(Hmax)e_steps%(steps)d_Angle%(Htheta)e_neighbours%(n)d_Loops%(loops)d' % locals(),folder=folder)
-        fieldloops = np.array(fieldloops)
-        q = np.array(q)
-        mag = np.array(mag)
-        monopole = np.array(monopole)
-        vertex = np.array(vertex)
-        file = 'RPMStateInfo_Hmax%(Hmax)e_steps%(steps)d_Angle%(Htheta)e_neighbours%(n)d_Loops%(loops)d' % locals()
-        parameters = np.array([Hmax, steps, Htheta, n, loops, self.Hc, self.Hc_std, period, tcycles])
-        print(parameters)
-        if folder == None:
-            folder = os.getcwd()
-            np.savez(os.path.join(folder, file), parameters, fieldloops, q, mag, monopole, vertex)
-        else:
-            np.savez(os.path.join(folder, file), parameters, fieldloops, q, mag, monopole, vertex)
-
-    def fieldSweepSine(self, Hmax, steps, Htheta, n=10, loops=1, folder=None, q1=False):
+    def SineField(self, Hmax, steps):
         '''
-        Sweeps through from zero to Hmax at angle Htheta following a Sine function in steps.
-        Total number of steps for a full minor loop is 12*step.
+        return a array of field sweep values from 0 to Hmax in the form of a sine wave
+        (2 * steps) field values in a period
+        '''
+        field_steps = Hmax * np.sin(np.linspace(0, 2 * np.pi, 2 * (steps)))
+        return field_steps
+
+    def fieldSweep(self, fieldType, Hmax, steps, Htheta, n=10, loops=1, folder=None, q1=False):
+        '''
+        Sweeps through the lattice using the designated field type.
+        Total number of steps for a full minor loop is (2 * step).
+        Allowed FieldTypes are:
+            Sine, Adaptive
         The function then performs loops number of minor loops
         The Lattice after each field step gets saved to a folder. if folder is None then the
         function saves the lattice to the current working directory
         '''
-        if folder == None:
-            folder = os.getcwd()
+
+        field_steps = {
+            'Sine': self.SineField(Hmax, steps),
+            'Adaptive': self.AdaptiveField(Hmax, steps)
+        }.get(fieldType, Exception('Field sweep type not defined'))
 
         self.field_angle = Htheta
-        testLattice = copy.deepcopy(self.lattice)
-        Htheta = np.pi * Htheta / 180
-        testLattice[testLattice[:, :, 6] == 0] = np.nan
+        Htheta = np.deg2rad(Htheta)
         if np.sin(Htheta) == 0:
             angleFactor = np.cos(Htheta)
         else:
             angleFactor = np.sin(Htheta)
-
-        field_steps = Hmax*np.sin(np.linspace(0, 2*np.pi, 12*(steps)))
-        field_steps = field_steps / angleFactor
+        field_steps = field_steps/angleFactor
 
         q, mag, monopole, fieldloops, vertex, counter = ([] for i in range(6))
         counter = 0
         i = 0
+        tcycles = 15
         period = None
 
         self.relax(n=n)
-
-        tcycles = 0
-
         if folder == None:
+            folder = os.getcwd()
             self.save(
                 'InitialRPMLattice_Hmax%(Hmax)e_steps%(steps)d_Angle%(Htheta)e_neighbours%(n)d_Loops%(loops)d' % locals(),
                 folder=folder)
@@ -343,6 +264,7 @@ class ASVI():
                     loops = i + period
                     tcycles=i
             i += 1
+            print(i,loops, period)
 
         self.save('FinalRPMLattice_Hmax%(Hmax)e_steps%(steps)d_Angle%(Htheta)e_neighbours%(n)d_Loops%(loops)d' % locals(),folder=folder)
         fieldloops = np.array(fieldloops)
@@ -352,13 +274,14 @@ class ASVI():
         vertex = np.array(vertex)
         file = 'RPMStateInfo_Hmax%(Hmax)e_steps%(steps)d_Angle%(Htheta)e_neighbours%(n)d_Loops%(loops)d' % locals()
         parameters = np.array([Hmax, steps, Htheta, n, loops, self.Hc, self.Hc_std, period, tcycles])
-        print(parameters)
 
         if folder == None:
             folder = os.getcwd()
             np.savez(os.path.join(folder, file), parameters, fieldloops, q, mag, monopole, vertex)
         else:
             np.savez(os.path.join(folder, file), parameters, fieldloops, q, mag, monopole, vertex)
+
+        print('SIMULATION COMPLETE!')
 
     def relax(self, Happlied = np.array([0.,0.,0.]), n=10):
         '''
@@ -412,7 +335,6 @@ class ASVI():
                 unrelaxed = False
             self.lattice = grid
             total_flipcount+=flipcount
-        # print(total_flipcount)
 
     def fieldSweepAnimation(self, folder, name='Lattice_counter'):
         '''
@@ -533,11 +455,11 @@ class ASVI():
 
         grid = self.lattice
         unique, count = np.unique(grid[x1:x2, y1:y2, 11], return_counts=True)
-        min_width = 100e-9
-        bar_length = self.get_bar_width(x, y)
-        vortex_prob = 0
 
-        if bar_length > min_width:     # thin bar below min_width cannot form vortex
+        min_width = 100e-9
+        bar_width = self.get_bar_width(x, y)
+        vortex_prob = 0
+        if bar_width > min_width:     # thin bar below min_width cannot form vortex
             if self.applied_field < 0:
                     if 1 in unique:
                         vortex_prob = 0.01*count[1] + 0.0305    # slightly more likely for vortex to from beside vortices
@@ -545,7 +467,7 @@ class ASVI():
                         vortex_prob = 0.0305
             else:
                     if 1 in unique:
-                        vortex_prob = 0.01*np.exp(count[1]) + 0.0134
+                        vortex_prob = 0.01*count[1] + 0.0134
                     else:
                         vortex_prob = 0.0134
         return vortex_prob
