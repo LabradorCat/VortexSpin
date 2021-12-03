@@ -24,7 +24,7 @@ reload(asvi)
 # Material & Lattice Parameters
 # Define the size of the lattice and material properties
 
-size = 10  ## Dimension of array
+size = 2  ## Dimension of array
 
 Hc_thin = 0.025  # Coercive Field (T)
 Hc_thick = 0.018
@@ -49,7 +49,7 @@ Hsteps = 10         # Number of steps between the minimum value of the coercive 
                     # and the maxium field specified above. Total number of steps in a
                     # minor loop is = (2*steps)
 neighbours = 1      # The radius of neighbouring spins that are included in the local field calculation
-loops = 10           # The number of minor field loops to be done
+loops = 1           # The number of minor field loops to be done
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Generate ASCI Class model
@@ -61,7 +61,7 @@ lattice.square_staircase(Hc_thin, Hc_thick, Hc_std / 100, thick_bar_width)  # Sp
 #-----------------------------------------------------------------------------------------------------------------------
 # Running Simulation and output results
 
-output_folder_name = 'ASVI_Simulation_Test'
+output_folder_name = 'ASVI_Simulation_Output'
 # Simulation results export to parent directory
 
 folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir, output_folder_name))
