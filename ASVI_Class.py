@@ -219,7 +219,7 @@ class ASVI():
             angleFactor = np.sin(Htheta)
         field_steps = field_steps / angleFactor
         # Create statistical parameters
-        q, mag, monopole, fieldloops, vertex, vortex_count = ([] for i in range(6))
+        q, mag, monopole, fieldloops, vortex_count, macrospin_count = (np.array([]) for i in range(6))
         counter = 0
         i = 0
         tcycles = 15
@@ -236,11 +236,13 @@ class ASVI():
                 self.applied_field = field
                 Happlied = field * np.array([np.cos(Htheta), np.sin(Htheta), 0.])
                 self.relax(Happlied, n)
-                fieldloops.append(np.array([counter, field]))
-                mag.append(self.netMagnetisation())
-                monopole.append(self.monopoleDensity())
-                q.append(self.correlation(self.previous, self))
-                vortex_count.append(self.count_vortex())
+                # saving statistical data
+                fieldloops = np.append(fieldloops, np.array([counter, field]))
+                q = np.append(q, self.correlation(self.previous, self))
+                mag = np.append(mag, self.netMagnetisation())
+                monopole = np.append(monopole, self.monopoleDensity())
+                vortex_count = np.append(vortex_count, self.count_vortex())
+                macrospin_count = np.append(macrospin_count, self.count_macrospin())
                 self.save('Lattice_counter%(counter)d_Loop%(i)d_FieldApplied%(field)e_Angle%(Htheta)e' % locals(),
                           folder=folder)
                 counter += 1
@@ -258,20 +260,14 @@ class ASVI():
         self.save(
             'FinalRPMLattice_Hmax%(Hmax)e_steps%(steps)d_Angle%(Htheta)e_neighbours%(n)d_Loops%(loops)d' % locals(),
             folder=folder)
-        fieldloops = np.array(fieldloops)
-        q = np.array(q)
-        mag = np.array(mag)
-        monopole = np.array(monopole)
-        vortex_count = np.array(vortex_count)
+
         file = 'RPMStateInfo_Hmax%(Hmax)e_steps%(steps)d_Angle%(Htheta)e_neighbours%(n)d_Loops%(loops)d' % locals()
         parameters = np.array([Hmax, steps, Htheta, n, loops, self.Hc, self.Hc_std, period, tcycles])
 
         if folder == None:
             folder = os.getcwd()
-            np.savez(os.path.join(folder, file), parameters, fieldloops, q, mag, monopole, vortex_count)
-        else:
-            np.savez(os.path.join(folder, file), parameters, fieldloops, q, mag, monopole, vortex_count)
 
+        np.savez(os.path.join(folder, file), parameters, fieldloops, q, mag, monopole, vortex_count, macrospin_count)
         print('SIMULATION COMPLETE!')
 
     def relax(self, Happlied=np.array([0., 0., 0.]), n=10):
@@ -322,7 +318,7 @@ class ASVI():
                 unrelaxed = False
             self.lattice = grid
 
-    def fieldSweepAnimation(self, folder, name='Lattice_counter'):
+    def fieldSweepAnimation(self, folder, fps = 10):
         '''
         Will produce an animation of the lattice as it goes through the field sweep
         just provide the folder where the field sweeps are saved
@@ -330,7 +326,7 @@ class ASVI():
         FFMpegWriter = manimation.writers['ffmpeg']
         metadata = dict(title='ASVI Simulation', artist='Matplotlib',
                         comment='Artificial Spin Vortex Ice Simulation')
-        writer = FFMpegWriter(fps=5, metadata=metadata)
+        writer = FFMpegWriter(fps = fps, metadata = metadata)
         fig, ax = plt.subplots(figsize=(8, 8), constrained_layout=True)
 
         def sortFunc(element):
@@ -347,11 +343,9 @@ class ASVI():
                     self.clearLattice()
                     self.load(os.path.join(root, file))
                     self.vertexCharge()
-
                     grid = self.lattice
                     H_applied = np.round(1000 * self.applied_field, 2)
                     H_theta = self.field_angle
-
                     X = grid[:, :, 0].flatten()
                     Y = grid[:, :, 1].flatten()
                     Z = grid[:, :, 2].flatten()
@@ -363,7 +357,6 @@ class ASVI():
                     Mz = grid[:, :, 5].flatten() * bar_l
                     Hc = grid[:, :, 6].flatten()
                     Cv = grid[:, :, 10].flatten()
-
                     # sorting out colors and thicknesses
                     line_w = []
                     line_rbg = []
@@ -379,44 +372,35 @@ class ASVI():
                             line_rbg.append((0, 0, 1))
                         else:
                             line_rbg.append((0, 0, 0))
-                    # fig = plt.figure(figsize=(6,6), num = 'test')
-                    # ax = fig.add_subplot(111)
+                    # plotting
                     ax.set_xlim([-1 * self.unit_cell_len, np.max(X) + self.unit_cell_len])
                     ax.set_ylim([-1 * self.unit_cell_len, np.max(Y) + self.unit_cell_len])
-                    # ax.set_title("Vertex Magnetic Charge Map",fontsize=14)
-                    # ax.set_xlabel("XAVG",fontsize=12)
-                    # ax.set_ylabel("YAVG",fontsize=12)
-                    # ax.grid(True,linestyle='-',color='0.75')
-
-                    ax.quiver(X, Y, Mx, My, angles='xy', scale_units='xy', scale=1, pivot='mid', zorder=1,
+                    ax.quiver(X, Y, Mx, My, cmap='gist_rainbow', angles='xy', scale_units='xy', scale=1, pivot='mid', zorder=1,
                               linewidths=line_w, color=line_rbg, edgecolors=line_rbg)
-                    # quiver.set_clim(self, 0, 2)
-                    # scatter with colormap mapping to z value
                     ax.scatter(X, Y, s=50, c=Cv, cmap='gist_rainbow', marker='o', zorder=2, vmax=1, vmin=-1)
-                    # cb2 = fig.colorbar(graph, fraction=0.046, pad=0.04, ax = ax)
-                    # ax.set(adjustable='box', aspect='equal')
                     plt.ticklabel_format(style='sci', scilimits=(0, 0))
-
                     ax.set_title("Steps: " + file[file.find('counter') + 7:file.find(r'_Loop')],
                                  loc='left', pad=20)
                     ax.set_title('Applied Field: {} mT, Field Angle = {} deg'.format(H_applied, H_theta),
                                  loc='right', pad=20)
-                    # print(file.find('counter'),file.find(r'_Loop'))
-                    # print(counter)
-                    # plt.show()
                     writer.grab_frame()
-                    # ims.append([im])
-        # sorted_ims = [x for _,x in sorted(zip(counter,ims))]
-        # anim = pla.ArtistAnimation(fig_anim, ims, interval = 100, blit = True, repeat_delay = 1000)
-        # Writer = pla.writers['ffmpeg']
-        # writer = pla.FFMpegWriter(fps=15, metadata=dict(artist='Alex Vanstone'), bitrate=1800)
-        # anim.save(os.path.join(folder, 'Video.mp4'), writer = writer)
-        # plt.show()
 
     # CALCULATIONS
     def count_vortex(self):
-        types = copy.deepcopy(self.lattice[:, :, 11])
-        return np.count_nonzero(types)
+        '''
+        Count the number of vortices in the lattice
+        '''
+        types = self.lattice[:, :, 11]
+        vortex_number = np.count_nonzero(types==1)
+        return vortex_number
+
+    def count_macrospin(self):
+        '''
+            Count the number of vortices in the lattice
+        '''
+        types = self.lattice[:, :, 11]
+        macrospin_number = np.count_nonzero(types==0)
+        return macrospin_number
 
     def vortex_prob(self, x, y, v_n=2):
         x1 = x - v_n
