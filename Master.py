@@ -19,12 +19,10 @@ import numpy as np
 #from functools import partial
 
 reload(asvi)
-
 #-----------------------------------------------------------------------------------------------------------------------
 # Material & Lattice Parameters
 # Define the size of the lattice and material properties
-
-size = 2  ## Dimension of array
+size = 10  ## Dimension of array
 
 Hc_thin = 0.025  # Coercive Field (T)
 Hc_thick = 0.018
@@ -39,7 +37,7 @@ thick_bar_width = 200e-9
 
 magnetisation = 800e3  # Saturation magnetisation of material in A/m (permalloy is 80e3)
 field_angle = 45.  # Angle at which the field will be applied in degrees
-field_max = 0.95 * Hc_thin  # Maximum field to by applied at field angle measured in Telsa
+field_max = 0.97 * Hc_thin  # Maximum field to by applied at field angle measured in Telsa
 magnetisation = 800e3  # Saturation magnetisation of material in A/m (permalloy is 80e3)
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -48,28 +46,23 @@ Field = 'Adaptive'  # Type of Field used to sweep the lattice
 Hsteps = 10         # Number of steps between the minimum value of the coercive field
                     # and the maxium field specified above. Total number of steps in a
                     # minor loop is = (2*steps)
-neighbours = 1      # The radius of neighbouring spins that are included in the local field calculation
-loops = 1           # The number of minor field loops to be done
+neighbours = 2      # The radius of neighbouring spins that are included in the local field calculation
+loops = 20         # The number of minor field loops to be done
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Generate ASCI Class model
-
 lattice = asvi.ASVI(size, size, bar_length = bar_length, bar_width = thin_bar_width, bar_thickness = bar_thickness,
                     vertex_gap=vertex_gap, magnetisation=magnetisation)
 lattice.square_staircase(Hc_thin, Hc_thick, Hc_std / 100, thick_bar_width)  # Specify whether it is a square or kagome lattice
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Running Simulation and output results
-
-output_folder_name = 'ASVI_Simulation_Output'
-# Simulation results export to parent directory
+output_folder_name = 'ASVI_Simulation_Output' # Simulation results export to 'output_folder_name' in the parent directory
+fps = 10    # Animation fps
 
 folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir, output_folder_name))
 if os.path.exists(folder) == False:
     os.mkdir(folder)
-
 lattice.fieldSweep(fieldType = 'Adaptive', Hmax = field_max, steps = Hsteps, Htheta = field_angle,
                    n = neighbours, loops = loops, folder = folder, q1 = False)
-lattice.fieldSweepAnimation(folder, name='Lattice_counter')
-
-
+lattice.fieldSweepAnimation(folder, fps = fps)
