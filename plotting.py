@@ -1,6 +1,26 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import BoundaryNorm, ListedColormap
 from scipy.optimize import curve_fit
+
+# Our customized Colormap
+clist = list('bkr')
+clist = ['#ff0000' if c == 'r' else c for c in clist]
+clist = ['#0000ff' if c == 'b' else c for c in clist]
+clist = ['#000000' if c == 'k' else c for c in clist]
+cmap = ListedColormap(clist)
+norm = BoundaryNorm([-1, -0.5, 0.5, 1], cmap.N)
+
+def test_cmap(cmap):
+    """
+    testing and showing color map
+    """
+    fig, ax = plt.subplots()
+    x = np.linspace(0, 10, 100)
+    y = x
+    c = np.linspace(-1, 1, 100)
+    ax.scatter(x, y, s=50, c=c, cmap=cmap)
+    plt.show()
 
 def load_summary(file, output):
     '''
@@ -87,26 +107,21 @@ def plot_vector_field_2D(lattice, ax):
     Y = lattice[:, :, 1].flatten()
     bar_l = lattice[:, :, 7].flatten()
     bar_w = lattice[:, :, 8].flatten()
-    Mx = lattice[:, :, 3].flatten() * bar_l
-    My = lattice[:, :, 4].flatten() * bar_l
+    Mx = lattice[:, :, 3].flatten()
+    My = lattice[:, :, 4].flatten()
+    U = Mx * bar_l  # normalise vector
+    V = My * bar_l  # normalise vector
     Cv = lattice[:, :, 10].flatten()
     # sorting out colors and thicknesses
     line_w = 4 * (bar_w > 100e-9) + 1
-    line_rbg = []
-    for i in range(len(Mx)):
-        if Mx[i] > 0 or My[i] > 0:
-            line_rbg.append((1, 0, 0))
-        elif Mx[i] < 0 or My[i] < 0:
-            line_rbg.append((0, 0, 1))
-        else:
-            line_rbg.append((0, 0, 0))
-    # plotting vector field for lattice
-    ax.quiver(X, Y, Mx, My, cmap='gist_rainbow', angles='xy', scale_units='xy', scale=1, pivot='mid', zorder=1,
-              linewidths=line_w, color=line_rbg, edgecolors=line_rbg)
+    line_rbg = np.arctan(Mx+My)
+    color = cmap(norm(line_rbg))
+    ax.quiver(X, Y, U, V, angles='xy', scale_units='xy', scale=1, pivot='mid', zorder=1,
+              linewidths=line_w, color=color, edgecolors=color)
     ax.scatter(X, Y, s=50, c=Cv, cmap='gist_rainbow', marker='o', zorder=2, vmax=1, vmin=-1)
     ax.set_xlabel('Lx (m)')
     ax.set_ylabel('Ly (m)')
-    plt.ticklabel_format(style='sci', scilimits=(0, 0))
+    ax.ticklabel_format(style='sci', scilimits=(0, 0))
     ax.use_sticky_edges = False
     return ax
 
