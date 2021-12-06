@@ -26,8 +26,9 @@ size = 10  ## Dimension of array
 
 Hc_thin = 0.025  # Coercive Field (T)
 Hc_thick = 0.018
+Hc_Vortex = 0.020
 
-Hc_std = 5  # Stanard deviation in the coercive field (as a percentage)
+Hc_std = 2  # Stanard deviation in the coercive field (as a percentage)
 bar_length = 400e-9  # Bar length in m
 vertex_gap = 100e-9  # Vertex gap in m
 bar_thickness = 20.5e-9  # Bar thickness in m
@@ -37,7 +38,7 @@ thick_bar_width = 200e-9
 
 magnetisation = 800e3  # Saturation magnetisation of material in A/m (permalloy is 80e3)
 field_angle = 45.  # Angle at which the field will be applied in degrees
-field_max = 0.97 * Hc_thin  # Maximum field to by applied at field angle measured in Telsa
+field_max = 0.0225  # Maximum field to by applied at field angle measured in Telsa
 magnetisation = 800e3  # Saturation magnetisation of material in A/m (permalloy is 80e3)
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -47,7 +48,7 @@ Hsteps = 10         # Number of steps between the minimum value of the coercive 
                     # and the maxium field specified above. Total number of steps in a
                     # minor loop is = (2*steps)
 neighbours = 2      # The radius of neighbouring spins that are included in the local field calculation
-loops = 20         # The number of minor field loops to be done
+loops = 30         # The number of minor field loops to be done
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Generate ASCI Class model
@@ -60,9 +61,16 @@ lattice.square_staircase(Hc_thin, Hc_thick, Hc_std / 100, thick_bar_width)  # Sp
 output_folder_name = 'ASVI_Simulation_Output' # Simulation results export to 'output_folder_name' in the parent directory
 fps = 10    # Animation fps
 
+Simulate = True
+Animate = True
+
 folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir, output_folder_name))
 if os.path.exists(folder) == False:
     os.mkdir(folder)
-lattice.fieldSweep(fieldType = 'Adaptive', Hmax = field_max, steps = Hsteps, Htheta = field_angle,
-                   n = neighbours, loops = loops, folder = folder, q1 = False)
-lattice.fieldSweepAnimation(folder, fps = fps)
+
+if Simulate:
+    lattice.fieldSweep(fieldType = 'Adaptive', Hmax = field_max, steps = Hsteps, Htheta = field_angle,
+                       n = neighbours, loops = loops, folder = folder, q1 = False)
+
+if Animate:
+    lattice.fieldSweepAnimation(folder, fps = fps)
