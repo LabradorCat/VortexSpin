@@ -22,7 +22,7 @@ reload(asvi)
 #-----------------------------------------------------------------------------------------------------------------------
 # Material & Lattice Parameters
 # Define the size of the lattice and material properties
-size = 10  ## Dimension of array
+size = 5  ## Dimension of array
 
 Hc_thin = 0.025  # Coercive Field (T)
 Hc_thick = 0.018
@@ -48,7 +48,7 @@ Hsteps = 10         # Number of steps between the minimum value of the coercive 
                     # and the maxium field specified above. Total number of steps in a
                     # minor loop is = (2*steps)
 neighbours = 2      # The radius of neighbouring spins that are included in the local field calculation
-loops = 30         # The number of minor field loops to be done
+loops = 1        # The number of minor field loops to be done
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Generate ASCI Class model
@@ -61,16 +61,17 @@ lattice.square_staircase(Hc_thin, Hc_thick, Hc_std / 100, thick_bar_width)  # Sp
 output_folder_name = 'ASVI_Simulation_Output' # Simulation results export to 'output_folder_name' in the parent directory
 fps = 10    # Animation fps
 
+# Select what to perform in this run
 Simulate = True
 Animate = True
+Show_statistics = True
 
-folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir, output_folder_name))
-if os.path.exists(folder) == False:
-    os.mkdir(folder)
-
-if Simulate:
-    lattice.fieldSweep(fieldType = 'Adaptive', Hmax = field_max, steps = Hsteps, Htheta = field_angle,
-                       n = neighbours, loops = loops, folder = folder, q1 = False)
-
-if Animate:
-    lattice.fieldSweepAnimation(folder, fps = fps)
+if __name__ == '__main__':
+    folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir, output_folder_name))
+    if os.path.exists(folder) == False:
+        os.mkdir(folder)
+    if Simulate:
+        lattice.fieldSweep(fieldType = Field, Hmax = field_max, steps = Hsteps, Htheta = field_angle,
+                           n = neighbours, loops = loops, folder = folder, q1 = False)
+    if Animate:
+        lattice.fieldSweepAnimation(folder, fps = fps)
