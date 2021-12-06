@@ -4,7 +4,7 @@ import copy
 import os
 import scipy.interpolate as spi
 import matplotlib.animation as manimation
-plt.rcParams['animation.ffmpeg_path'] = r'E:\ASI_MSci_Project\ffmpeg\bin\ffmpeg.exe'
+plt.rcParams['animation.ffmpeg_path'] = r'C:\FFMPEG\ffmpeg.exe'
 
 
 class ASVI():
