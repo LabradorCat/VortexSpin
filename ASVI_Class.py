@@ -237,7 +237,7 @@ class ASVI():
                 Happlied = field * np.array([np.cos(Htheta), np.sin(Htheta), 0.])
                 self.relax(Happlied, n)
                 # saving statistical data
-                fieldloops = np.append(fieldloops, np.array([counter, field]))
+                fieldloops = np.append(fieldloops, field)
                 q = np.append(q, self.correlation(self.previous, self))
                 mag = np.append(mag, self.netMagnetisation())
                 monopole = np.append(monopole, self.monopoleDensity())
@@ -256,17 +256,14 @@ class ASVI():
                     loops = i + period
                     tcycles = i
             i += 1
-
         self.save(
             'FinalRPMLattice_Hmax%(Hmax)e_steps%(steps)d_Angle%(Htheta)e_neighbours%(n)d_Loops%(loops)d' % locals(),
             folder=folder)
-
+        # Saving statistical information
         file = 'RPMStateInfo_Hmax%(Hmax)e_steps%(steps)d_Angle%(Htheta)e_neighbours%(n)d_Loops%(loops)d' % locals()
         parameters = np.array([Hmax, steps, Htheta, n, loops, self.Hc, self.Hc_std, period, tcycles])
-
         if folder == None:
             folder = os.getcwd()
-
         np.savez(os.path.join(folder, file), parameters, fieldloops, q, mag, monopole, vortex_count, macrospin_count)
         print('SIMULATION COMPLETE!')
 
@@ -372,13 +369,15 @@ class ASVI():
                             line_rbg.append((0, 0, 1))
                         else:
                             line_rbg.append((0, 0, 0))
-                    # plotting
+                    # plotting vector field for lattice
                     ax.set_xlim([-1 * self.unit_cell_len, np.max(X) + self.unit_cell_len])
                     ax.set_ylim([-1 * self.unit_cell_len, np.max(Y) + self.unit_cell_len])
                     ax.quiver(X, Y, Mx, My, cmap='gist_rainbow', angles='xy', scale_units='xy', scale=1, pivot='mid', zorder=1,
                               linewidths=line_w, color=line_rbg, edgecolors=line_rbg)
                     ax.scatter(X, Y, s=50, c=Cv, cmap='gist_rainbow', marker='o', zorder=2, vmax=1, vmin=-1)
                     plt.ticklabel_format(style='sci', scilimits=(0, 0))
+                    ax.set_xlabel('Lx (m)')
+                    ax.set_ylabel('Ly (m)')
                     ax.set_title("Steps: " + file[file.find('counter') + 7:file.find(r'_Loop')],
                                  loc='left', pad=20)
                     ax.set_title('Applied Field: {} mT, Field Angle = {} deg'.format(H_applied, H_theta),
