@@ -1,9 +1,12 @@
+import os
+import copy
 import numpy as np
 import matplotlib.pyplot as plt
-import copy
-import os
 import matplotlib.animation as manimation
-plt.rcParams['animation.ffmpeg_path'] = r'C:\FFMPEG\ffmpeg.exe'
+from tqdm import tqdm
+
+from plotting import plot_vector_field_2D
+plt.rcParams['animation.ffmpeg_path'] = r'E:\ASI_MSci_Project\ffmpeg\bin\ffmpeg.exe'
 
 
 class ASVI():
@@ -173,15 +176,15 @@ class ASVI():
         self.lattice[:, :, 8] = bar_w
         self.lattice[:, :, 6] = Hc
 
-    # SIMULATION EXECUTABLES
+    # APPLIED FIELD TYPES
     def AdaptiveField(self, Hmax, steps):
         '''
-        Sweeps through minimum Coercive field to Hmax, go from positive to negative
+        Return array of field steps ranging from minimum Coercive field to Hmax
+        Applied fields go from positive to negative
         (2 * steps) field values in a period
         '''
         testLattice = copy.deepcopy(self.lattice)
         testLattice[testLattice[:, :, 6] == 0] = np.nan
-
         Hc_min = np.nanmin(testLattice[:, :, 6])
         field_steps = np.linspace(Hc_min, Hmax, steps)
         field_steps = np.append(field_steps, np.negative(field_steps))
@@ -195,6 +198,18 @@ class ASVI():
         field_steps = Hmax * np.sin(np.linspace(0, 2 * np.pi, 2 * (steps)))
         return field_steps
 
+    def LinearField(self, Hmax, steps):
+        '''
+        Return a array of field steps linearly increasing field from Hmin to Hmax
+        (steps) number of field values
+        '''
+        testLattice = copy.deepcopy(self.lattice)
+        testLattice[testLattice[:, :, 6] == 0] = np.nan
+        Hmin = np.nanmin(testLattice[:, :, 6])
+        field_steps = np.linspace(Hmin, Hmax, steps)
+        return field_steps
+
+    # SIMULATION EXECUTABLES
     def fieldSweep(self, fieldType, Hmax, steps, Htheta, n=10, loops=1, folder=None, q1=False):
         '''
         Sweeps through the lattice using the designated field type.
@@ -208,15 +223,16 @@ class ASVI():
         # Determine which field type to sweep the lattice
         field_steps = {
             'Sine': self.SineField(Hmax, steps),
-            'Adaptive': self.AdaptiveField(Hmax, steps)
+            'Adaptive': self.AdaptiveField(Hmax, steps),
+            'Linear': self.LinearField(Hmax, steps)
         }.get(fieldType, Exception('Field sweep type not defined'))
         # Working out field angle and amend field steps
         self.field_angle = Htheta
-        Htheta = np.deg2rad(Htheta)
-        if np.sin(Htheta) == 0:
-            angleFactor = np.cos(Htheta)
+        Hrad = np.deg2rad(Htheta)
+        if np.sin(Hrad) == 0:
+            angleFactor = np.cos(Hrad)
         else:
-            angleFactor = np.sin(Htheta)
+            angleFactor = np.sin(Hrad)
         field_steps = field_steps / angleFactor
         # Create statistical parameters
         q, mag, monopole, fieldloops, vortex_count, macrospin_count = (np.array([]) for i in range(6))
@@ -225,16 +241,16 @@ class ASVI():
         tcycles = 15
         period = None
         # Start the field sweep
+        print('STARTING SIMULATION WITH {} MINOR LOOPS...'.format(loops))
         self.relax(n=n)
-        self.save(
-            'InitialRPMLattice_Hmax%(Hmax)e_steps%(steps)d_Angle%(Htheta)e_neighbours%(n)d_Loops%(loops)d' % locals(),
-            folder=folder)
+        self.save('InitialASVI_Hmax{:.3f}_steps{}_Angle{:.0f}_n{}_Loops{}'.format(
+                   Hmax, steps, Htheta, n, loops), folder=folder)
         while i <= loops:
             self.previous = copy.deepcopy(self)
-            for field in field_steps:
-                print('Calculating loop ', i, ' step ', counter, ' with Happlied =', field)
+            for field in tqdm(field_steps, desc='Simulation Loop {} Progress: '.format(i),
+                              unit='step'):
                 self.applied_field = field
-                Happlied = field * np.array([np.cos(Htheta), np.sin(Htheta), 0.])
+                Happlied = field * np.array([np.cos(Hrad), np.sin(Hrad), 0.])
                 self.relax(Happlied, n)
                 # saving statistical data
                 fieldloops = np.append(fieldloops, field)
@@ -243,8 +259,8 @@ class ASVI():
                 monopole = np.append(monopole, self.monopoleDensity())
                 vortex_count = np.append(vortex_count, self.count_vortex())
                 macrospin_count = np.append(macrospin_count, self.count_macrospin())
-                self.save('Lattice_counter%(counter)d_Loop%(i)d_FieldApplied%(field)e_Angle%(Htheta)e' % locals(),
-                          folder=folder)
+                self.save('ASVIcounter{}_Loop{}_FieldApplied{:.3f}_Angle{:.0f}'.format(
+                    counter, i, field, Htheta), folder=folder)
                 counter += 1
             if q1 == True and period == None:
                 finalfield = abs(field)
@@ -256,11 +272,10 @@ class ASVI():
                     loops = i + period
                     tcycles = i
             i += 1
-        self.save(
-            'FinalRPMLattice_Hmax%(Hmax)e_steps%(steps)d_Angle%(Htheta)e_neighbours%(n)d_Loops%(loops)d' % locals(),
-            folder=folder)
+        self.save('FinalASVI_Hmax{:.3f}_steps{}_Angle{:.0f}_n{}_Loops{}'.format(
+                   Hmax, steps, Htheta, n, loops), folder=folder)
         # Saving statistical information
-        file = 'RPMStateInfo_Hmax%(Hmax)e_steps%(steps)d_Angle%(Htheta)e_neighbours%(n)d_Loops%(loops)d' % locals()
+        file = 'ASVIStateInfo_Hmax{:.3f}_steps{}_Angle{:.0f}_n{}_Loops{}'.format(Hmax, steps, Htheta, n, loops)
         parameters = np.array([Hmax, steps, Htheta, n, loops, self.Hc, self.Hc_std, period, tcycles])
         if folder == None:
             folder = os.getcwd()
@@ -299,15 +314,12 @@ class ASVI():
                             grid[x, y, 11] = 1
                             grid[x, y, 13] += 1
                             vortexcount += 1
-                            print('Vortex loc', x, y)
                         else:
                             grid[x, y, 3:5] = np.negative(grid[x, y, 3:5])
                             grid[x, y, 12] += 1
                             flipcount += 1
-                            print('Flip loc', x, y)
                 else:
                     print('wrong spin')
-            print("number of flipped spins in relax = ", flipcount)
             grid[grid == -0.] = 0.
             if flipcount > 0:
                 unrelaxed = True
@@ -320,6 +332,7 @@ class ASVI():
         Will produce an animation of the lattice as it goes through the field sweep
         just provide the folder where the field sweeps are saved
         '''
+        print('STARTING TO MAKE ANIMATION...')
         FFMpegWriter = manimation.writers['ffmpeg']
         metadata = dict(title='ASVI Simulation', artist='Matplotlib',
                         comment='Artificial Spin Vortex Ice Simulation')
@@ -333,56 +346,25 @@ class ASVI():
 
         with writer.saving(fig, (os.path.join(folder, "animation.mp4")), 100):
             for root, dirs, files in os.walk(folder):
-                new_files = list(filter(lambda x: 'Lattice_counter' in x, files))
+                new_files = list(filter(lambda x: 'ASVIcounter' in x, files))
                 new_files.sort(key=sortFunc)
-                for file in new_files:
+                for file in tqdm(new_files, desc='Animation Progress: ', unit='frame'):
                     ax.clear()
                     self.clearLattice()
                     self.load(os.path.join(root, file))
                     self.vertexCharge()
-                    grid = self.lattice
+                    grid = copy.deepcopy(self.lattice)
+                    # plotting vector field
+                    ax = plot_vector_field_2D(grid, ax)
+                    # setting title
                     H_applied = np.round(1000 * self.applied_field, 2)
                     H_theta = self.field_angle
-                    X = grid[:, :, 0].flatten()
-                    Y = grid[:, :, 1].flatten()
-                    Z = grid[:, :, 2].flatten()
-                    bar_l = grid[:, :, 7].flatten()
-                    bar_w = (grid[:, :, 8].flatten())
-                    bar_t = grid[:, :, 9].flatten()
-                    Mx = (grid[:, :, 3].flatten()) * bar_l
-                    My = grid[:, :, 4].flatten() * bar_l
-                    Mz = grid[:, :, 5].flatten() * bar_l
-                    Hc = grid[:, :, 6].flatten()
-                    Cv = grid[:, :, 10].flatten()
-                    # sorting out colors and thicknesses
-                    line_w = []
-                    line_rbg = []
-                    for w in bar_w:
-                        if w > 100e-9:
-                            line_w.append(4)
-                        else:
-                            line_w.append(1)
-                    for i in range(len(Mx)):
-                        if Mx[i] > 0 or My[i] > 0:
-                            line_rbg.append((1, 0, 0))
-                        elif Mx[i] < 0 or My[i] < 0:
-                            line_rbg.append((0, 0, 1))
-                        else:
-                            line_rbg.append((0, 0, 0))
-                    # plotting vector field for lattice
-                    ax.set_xlim([-1 * self.unit_cell_len, np.max(X) + self.unit_cell_len])
-                    ax.set_ylim([-1 * self.unit_cell_len, np.max(Y) + self.unit_cell_len])
-                    ax.quiver(X, Y, Mx, My, cmap='gist_rainbow', angles='xy', scale_units='xy', scale=1, pivot='mid', zorder=1,
-                              linewidths=line_w, color=line_rbg, edgecolors=line_rbg)
-                    ax.scatter(X, Y, s=50, c=Cv, cmap='gist_rainbow', marker='o', zorder=2, vmax=1, vmin=-1)
-                    plt.ticklabel_format(style='sci', scilimits=(0, 0))
-                    ax.set_xlabel('Lx (m)')
-                    ax.set_ylabel('Ly (m)')
-                    ax.set_title("Steps: " + file[file.find('counter') + 7:file.find(r'_Loop')],
-                                 loc='left', pad=20)
+                    steps = file[file.find('counter') + 7:file.find(r'_Loop')]
+                    ax.set_title("Steps: " + steps, loc='left', pad=20)
                     ax.set_title('Applied Field: {} mT, Field Angle = {} deg'.format(H_applied, H_theta),
                                  loc='right', pad=20)
                     writer.grab_frame()
+        print('ANIMATION COMPLETE!')
 
     # CALCULATIONS
     def count_vortex(self):
@@ -692,5 +674,4 @@ class ASVI():
                 break
         self.load(filenames_neg[-1])
 
-    # STATISTICS
 

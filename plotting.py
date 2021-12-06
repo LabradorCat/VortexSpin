@@ -71,6 +71,45 @@ def plot_vortex_macrospin_number(vortex_count, macrospin_count):
     ax.grid()
     plt.show()
 
+def plot_vector_field_2D(lattice, ax):
+    """
+    Return a vector field according to the input lattice
+    Represented elements include:
+        - Macrospins: red/blue arrows
+        - Vertices: colored dots with color representing vertex charges
+        - Vortices: black dots
+    Input parameter specifications:
+        - lattice: 3D numpy.ndarray from the ASVI class
+        - ax: the matplotlib axis to plot the vector field
+    """
+    # extracting useful values from lattice
+    X = lattice[:, :, 0].flatten()
+    Y = lattice[:, :, 1].flatten()
+    bar_l = lattice[:, :, 7].flatten()
+    bar_w = lattice[:, :, 8].flatten()
+    Mx = lattice[:, :, 3].flatten() * bar_l
+    My = lattice[:, :, 4].flatten() * bar_l
+    Cv = lattice[:, :, 10].flatten()
+    # sorting out colors and thicknesses
+    line_w = 4 * (bar_w > 100e-9) + 1
+    line_rbg = []
+    for i in range(len(Mx)):
+        if Mx[i] > 0 or My[i] > 0:
+            line_rbg.append((1, 0, 0))
+        elif Mx[i] < 0 or My[i] < 0:
+            line_rbg.append((0, 0, 1))
+        else:
+            line_rbg.append((0, 0, 0))
+    # plotting vector field for lattice
+    ax.quiver(X, Y, Mx, My, cmap='gist_rainbow', angles='xy', scale_units='xy', scale=1, pivot='mid', zorder=1,
+              linewidths=line_w, color=line_rbg, edgecolors=line_rbg)
+    ax.scatter(X, Y, s=50, c=Cv, cmap='gist_rainbow', marker='o', zorder=2, vmax=1, vmin=-1)
+    ax.set_xlabel('Lx (m)')
+    ax.set_ylabel('Ly (m)')
+    plt.ticklabel_format(style='sci', scilimits=(0, 0))
+    ax.use_sticky_edges = False
+    return ax
+
 if __name__ == '__main__':
     file = 'E:\ASI_MSci_Project\ASVI_Simulation_Output\RPMStateInfo_Hmax2.250000e-02_steps10_Angle7.853982e-01_neighbours2_Loops30'
     vc = load_summary(file, output='vortex_count')
