@@ -4,9 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as manimation
 from tqdm import tqdm
-
 from plotting import plot_vector_field_2D
-plt.rcParams['animation.ffmpeg_path'] = r'E:\ASI_MSci_Project\ffmpeg\bin\ffmpeg.exe'
+
+plt.rcParams['animation.ffmpeg_path'] = r'D:\ASI_MSci_Project\ffmpeg\bin\ffmpeg.exe'
 
 
 class ASVI():
@@ -36,14 +36,15 @@ class ASVI():
     '''
 
     # INITIALISATION
-    def __init__(self, unit_cells_x=25, unit_cells_y=25, lattice=None,
-                 bar_length=220e-9, vertex_gap=1e-7, bar_thickness=25e-9,
-                 bar_width=80e-9, magnetisation=800e3):
+    def __init__(self, unit_cells_x=25, unit_cells_y=25, lattice=None, vertex_gap=1e-7,
+                 bar_length=220e-9, bar_thickness=25e-9, bar_width=80e-9, magnetisation=800e3):
         # Material Parameters
         self.lattice = lattice
         self.previous = None
         self.type = None
-        self.Hc = None
+        self.Hc_thin = None
+        self.Hc_fat = None
+        self.Hc_vortex = None
         self.Hc_std = None
         self.vertex_gap = vertex_gap
         self.bar_length = bar_length
@@ -61,7 +62,7 @@ class ASVI():
         self.applied_field = None
         self.field_angle = None
 
-    # RETURN LATTICE PROPERTIES
+    # LATTICE PROPERTIES GETTING & SETTING
     def returnLattice(self):
         '''
         Returns the lattice in its current state
@@ -76,6 +77,43 @@ class ASVI():
 
     def get_bar_width(self, x, y):
         return (self.lattice[x, y, 8])
+
+    def set_vortex(self, x, y, lattice = None):
+        '''
+        Set a point in lattice to vortex
+        '''
+        Hc_vortex = 0.020
+        Hc_std = 0.05
+        if lattice is None:
+            lattice = self.lattice
+        lattice[x, y, 11] = 1
+        lattice[x, y, 3:6] = 0
+        lattice[x, y, 6] = np.random.normal(loc=Hc_vortex, scale=Hc_std * Hc_vortex, size=None)
+        return lattice
+
+    def set_macrospin(self, x, y, lattice = None):
+        '''
+            Set a point in lattice to macrospin
+        '''
+        Hc = self.Hc
+        Hc_std = self.Hc_std
+        if lattice is None:
+            lattice = self.lattice
+        lattice[x, y, 11] = 0
+        lattice[x, y, 6] = np.random.normal(loc = Hc, scale = Hc_std * Hc, size = None)
+        if y % 2 == 0:
+            lattice[x, y, 3:6] = np.array([1., 0., 0.])
+        else:
+            lattice[x, y, 3:6] = np.array([0., 1., 0.])
+        return lattice
+
+    def get_unit_vector(self, x, y, lattice = None):
+        if lattice is None:
+            lattice = self.lattice
+        if y % 2 == 0:
+            return np.array([1., 0., 0.])
+        else:
+            return np.array([0., 1., 0.])
 
     # SAVE & LOAD FUNCTIONS
     def save(self, file, folder=os.getcwd()):
@@ -164,15 +202,20 @@ class ASVI():
                 if x % 4 == 0 and y % 4 == 1:
                     bar_w[x, y] = thick_bar_w
                     Hc[x, y] = Hc_new
+                    #lattice = self.set_vortex(x, y, lattice)
                 elif x % 4 == 2 and y % 4 == 3:
                     bar_w[x, y] = thick_bar_w
                     Hc[x, y] = Hc_new
+                    #lattice = self.set_vortex(x, y, lattice)
                 elif x % 4 == 1 and y % 4 == 2:
                     bar_w[x, y] = thick_bar_w
                     Hc[x, y] = Hc_new
+                    #lattice = self.set_vortex(x, y, lattice)
                 elif x % 4 == 3 and y % 4 == 0:
                     bar_w[x, y] = thick_bar_w
                     Hc[x, y] = Hc_new
+                    #lattice = self.set_vortex(x, y, lattice)
+        self.lattice = lattice
         self.lattice[:, :, 8] = bar_w
         self.lattice[:, :, 6] = Hc
 
@@ -206,7 +249,8 @@ class ASVI():
         testLattice = copy.deepcopy(self.lattice)
         testLattice[testLattice[:, :, 6] == 0] = np.nan
         Hmin = np.nanmin(testLattice[:, :, 6])
-        field_steps = np.linspace(Hmin, Hmax, steps)
+        field_steps = np.linspace(Hmin-0.010, Hmax, steps)
+        field_steps = np.negative(field_steps)
         return field_steps
 
     # SIMULATION EXECUTABLES
@@ -304,22 +348,26 @@ class ASVI():
             for pos in positions_new:
                 x = pos[0]
                 y = pos[1]
-                if abs(grid[x, y, 6]) != 0:
-                    unit_vector = grid[x, y, 3:6]
-                    field = np.dot(np.array(Happlied + self.Hlocal(x, y, n=n)), unit_vector)
-                    if field < -grid[x, y, 6]:
-                        if np.random.random() <= self.vortex_prob(x, y):
-                            grid[x, y, 3:6] = 0
-                            grid[x, y, 6] = np.random.normal(loc=Hc_vortex, scale=Hc_std * Hc_vortex, size=None)
-                            grid[x, y, 11] = 1
-                            grid[x, y, 13] += 1
-                            vortexcount += 1
-                        else:
-                            grid[x, y, 3:5] = np.negative(grid[x, y, 3:5])
-                            grid[x, y, 12] += 1
-                            flipcount += 1
-                else:
-                    print('wrong spin')
+                if grid[x, y, 11] == 0:     # test if object is a macrospin
+                    if abs(grid[x, y, 6]) != 0:
+                        unit_vector = grid[x, y, 3:6]
+                        field = np.dot(np.array(Happlied + self.Hlocal(x, y, n=n)), unit_vector)
+                        if field < -grid[x, y, 6]:
+                            if np.random.random() <= self.vortex_prob(x, y):
+                                grid = self.set_vortex(x, y, grid)
+                                grid[x, y, 13] += 1
+                                vortexcount += 1
+                            else:
+                                grid[x, y, 3:6] = np.negative(grid[x, y, 3:6])
+                                grid[x, y, 12] += 1
+                                flipcount += 1
+                elif grid[x, y, 11] == 1:   # test if object is a vortex
+                    if abs(grid[x, y, 6]) != 0:
+                        unit_vector = self.get_unit_vector(x, y, grid)
+                        field = np.dot(np.array(Happlied + self.Hlocal(x, y, n=n)), unit_vector)
+                        if field < -grid[x, y, 6]:
+                            grid = self.set_macrospin(x, y, grid)
+
             grid[grid == -0.] = 0.
             if flipcount > 0:
                 unrelaxed = True

@@ -3,20 +3,6 @@ import ASVI_Class as asvi
 from importlib import *
 import os
 import numpy as np
-# import Plasimage_recogntion
-#import matplotlib.pyplot as plt
-#from skimage import data, feature, exposure
-#from PIL import Image
-#import argparse
-#import cv2
-#import math
-#from shapely import geometry
-#from matplotlib import pyplot as plt
-#from scipy import spatial
-#import itertools
-#import matplotlib.cm as cm
-#import matplotlib.colors as cl
-#from functools import partial
 
 reload(asvi)
 #-----------------------------------------------------------------------------------------------------------------------
@@ -44,11 +30,11 @@ magnetisation = 800e3  # Saturation magnetisation of material in A/m (permalloy 
 #-----------------------------------------------------------------------------------------------------------------------
 # Simulation Parameters
 Field = 'Adaptive'  # Type of Field used to sweep the lattice
-Hsteps = 10         # Number of steps between the minimum value of the coercive field
+Hsteps = 20         # Number of steps between the minimum value of the coercive field
                     # and the maxium field specified above. Total number of steps in a
                     # minor loop is = (2*steps)
 neighbours = 2      # The radius of neighbouring spins that are included in the local field calculation
-loops = 1        # The number of minor field loops to be done
+loops = 5        # The number of minor field loops to be done
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Generate ASCI Class model
