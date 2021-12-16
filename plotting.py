@@ -11,6 +11,7 @@ clist = ['#000000' if c == 'k' else c for c in clist]
 cmap = ListedColormap(clist)
 norm = BoundaryNorm([-1, -0.5, 0.5, 1], cmap.N)
 
+
 def test_cmap(cmap):
     """
     testing and showing color map
@@ -21,6 +22,7 @@ def test_cmap(cmap):
     c = np.linspace(-1, 1, 100)
     ax.scatter(x, y, s=50, c=c, cmap=cmap)
     plt.show()
+
 
 def load_summary(file, output):
     '''
@@ -49,6 +51,7 @@ def load_summary(file, output):
     }.get(output, None)
     return summary
 
+
 def plot_applied_field(field):
     # plotting external field
     steps = np.arange(0, len(field), 1)
@@ -60,6 +63,7 @@ def plot_applied_field(field):
     # ax.plot(int(file[file.find('counter') + 7:file.find(r'_Loop')]), H_applied,
     #          marker='o', markersize=3, markerfacecolor='red', markeredgecolor='red')
     plt.show()
+
 
 def plot_vortex_macrospin_number(vortex_count, macrospin_count, fitfunc):
     '''
@@ -75,7 +79,7 @@ def plot_vortex_macrospin_number(vortex_count, macrospin_count, fitfunc):
         return a * np.exp(-b * x + c) + d
 
     def sigmoid(x, a, b, c, d):
-        return a/(1 + np.exp(-b * x + c)) + d
+        return a / (1 + np.exp(-b * x + c)) + d
 
     fig, ax = plt.subplots()
     if fitfunc == 'exp':
@@ -102,6 +106,7 @@ def plot_vortex_macrospin_number(vortex_count, macrospin_count, fitfunc):
     ax.legend()
     ax.grid()
     plt.show()
+
 
 def plot_vector_field_2D(lattice, ax):
     """
@@ -137,10 +142,13 @@ def plot_vector_field_2D(lattice, ax):
     ax.use_sticky_edges = False
     return ax
 
+
 if __name__ == '__main__':
+    """
     file = 'D:\ASI_MSci_Project\ASVI_Simulation_Output\ASVIStateInfo_Hmax0.030_steps100_Angle45_n2_Loops0.npz'
     vc = load_summary(file, output='vortex_count')
     mc = load_summary(file, output='macrospin_count')
     fd = load_summary(file, output='fieldloops')
     plot_applied_field(fd)
     plot_vortex_macrospin_number(vc, mc, 'sigmoid')
+    """
