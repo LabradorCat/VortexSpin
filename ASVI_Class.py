@@ -42,8 +42,8 @@ class ASVI():
         self.lattice = lattice
         self.previous = None
         self.type = None
-        self.Hc_thin = None
-        self.Hc_fat = None
+        self.Hc = None
+        self.Hc_thick = None
         self.Hc_vortex = None
         self.Hc_std = None
         self.vertex_gap = vertex_gap
@@ -83,7 +83,7 @@ class ASVI():
         Set a point in lattice to vortex
         '''
         Hc_vortex = 0.020
-        Hc_std = 0.05
+        Hc_std = 0.02
         if lattice is None:
             lattice = self.lattice
         lattice[x, y, 11] = 1
@@ -95,7 +95,7 @@ class ASVI():
         '''
             Set a point in lattice to macrospin
         '''
-        Hc = self.Hc
+        Hc = 0.015
         Hc_std = self.Hc_std
         if lattice is None:
             lattice = self.lattice
@@ -193,6 +193,7 @@ class ASVI():
 
     def square_staircase(self, Hc_thin=0.03, Hc_thick=0.015, Hc_std=0.05, thick_bar_w=80e-9):
         self.square(Hc_thin, Hc_std)
+        self.Hc_thick = Hc_thick
         lattice = copy.deepcopy(self.lattice)
         bar_w = lattice[:, :, 8]
         Hc = lattice[:, :, 6]
@@ -215,6 +216,34 @@ class ASVI():
                     bar_w[x, y] = thick_bar_w
                     Hc[x, y] = Hc_new
                     #lattice = self.set_vortex(x, y, lattice)
+        self.lattice = lattice
+        self.lattice[:, :, 8] = bar_w
+        self.lattice[:, :, 6] = Hc
+
+    def square_staircase_vortex(self, Hc_thin=0.03, Hc_thick=0.015, Hc_std=0.05, thick_bar_w=80e-9):
+        self.square(Hc_thin, Hc_std)
+        lattice = copy.deepcopy(self.lattice)
+        bar_w = lattice[:, :, 8]
+        Hc = lattice[:, :, 6]
+        for x in range(0, self.side_len_x):
+            for y in range(0, self.side_len_y):
+                Hc_new = np.random.normal(loc=Hc_thick, scale=Hc_std * Hc_thick, size=None)
+                if x % 4 == 0 and y % 4 == 1:
+                    bar_w[x, y] = thick_bar_w
+                    Hc[x, y] = Hc_new
+                    lattice = self.set_vortex(x, y, lattice)
+                elif x % 4 == 2 and y % 4 == 3:
+                    bar_w[x, y] = thick_bar_w
+                    Hc[x, y] = Hc_new
+                    lattice = self.set_vortex(x, y, lattice)
+                elif x % 4 == 1 and y % 4 == 2:
+                    bar_w[x, y] = thick_bar_w
+                    Hc[x, y] = Hc_new
+                    lattice = self.set_vortex(x, y, lattice)
+                elif x % 4 == 3 and y % 4 == 0:
+                    bar_w[x, y] = thick_bar_w
+                    Hc[x, y] = Hc_new
+                    lattice = self.set_vortex(x, y, lattice)
         self.lattice = lattice
         self.lattice[:, :, 8] = bar_w
         self.lattice[:, :, 6] = Hc
@@ -249,7 +278,7 @@ class ASVI():
         testLattice = copy.deepcopy(self.lattice)
         testLattice[testLattice[:, :, 6] == 0] = np.nan
         Hmin = np.nanmin(testLattice[:, :, 6])
-        field_steps = np.linspace(Hmin-0.010, Hmax, steps)
+        field_steps = np.linspace(Hmin-0.006, Hmax, steps)
         field_steps = np.negative(field_steps)
         return field_steps
 
@@ -454,12 +483,12 @@ class ASVI():
         if bar_width > min_width:  # thin bar below min_width cannot form vortex
             if self.applied_field < 0:
                 if 1 in unique:
-                    vortex_prob = 0.01 * count[1] + 0.0305  # slightly more likely for vortex to from beside vortices
+                    vortex_prob = 0.02 * count[1] + 0.0305  # slightly more likely for vortex to from beside vortices
                 else:
                     vortex_prob = 0.0305
             else:
                 if 1 in unique:
-                    vortex_prob = 0.01 * count[1] + 0.0134
+                    vortex_prob = 0.02 * count[1] + 0.0134
                 else:
                     vortex_prob = 0.0134
         return vortex_prob

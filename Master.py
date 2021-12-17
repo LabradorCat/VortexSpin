@@ -1,11 +1,12 @@
 
 import ASVI_Class as asvi
-from importlib import *
-from time import time, sleep
 import shutil
 import matplotlib.pyplot as plt
 import os
 import numpy as np
+from importlib import *
+from time import time, sleep
+from plotting import plot_vortex_macrospin_number, load_summary
 
 reload(asvi)
 #-----------------------------------------------------------------------------------------------------------------------
@@ -13,7 +14,7 @@ reload(asvi)
 # Define the size of the lattice and material properties
 size = 5  ## Dimension of array
 Hc_thin = 0.025  # Coercive Field (T)
-Hc_thick = 0.018
+Hc_thick = 0.015
 Hc_Vortex = 0.020
 Hc_std = 2  # Stanard deviation in the coercive field (as a percentage)
 bar_length = 400e-9  # Bar length in m
@@ -23,17 +24,17 @@ thin_bar_width = 100e-9  # Bar width in m
 thick_bar_width = 200e-9
 magnetisation = 800e3  # Saturation magnetisation of material in A/m (permalloy is 80e3)
 field_angle = 45.  # Angle at which the field will be applied in degrees
-field_max = 0.0225  # Maximum field to by applied at field angle measured in Telsa
+field_max = 0.0192  # Maximum field to by applied at field angle measured in Telsa
 magnetisation = 800e3  # Saturation magnetisation of material in A/m (permalloy is 80e3)
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Simulation Parameters
-Field = 'Adaptive'  # Type of Field used to sweep the lattice
+Field = 'Linear'  # Type of Field used to sweep the lattice
 Hsteps = 20         # Number of steps between the minimum value of the coercive field
                     # and the maxium field specified above. Total number of steps in a
                     # minor loop is = (2*steps)
 neighbours = 2      # The radius of neighbouring spins that are included in the local field calculation
-loops = 5        # The number of minor field loops to be done
+loops = 10          # The number of minor field loops to be done
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Benchmarking Functions
@@ -65,7 +66,44 @@ def test_sim_speed(maxsize, Hsteps, neighbours, loops):
     plt.grid()
     plt.show()
 
-def test_vortex_gen():
+
+def test_vortex_exp(maxsize = 20, step = 5):
+    size = 5
+    folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir, 'ASVI_test_cache'))
+    fig, ax = plt.subplots()
+    while size <= maxsize:
+        test_asvi = asvi.ASVI(size, size, bar_length=bar_length, bar_width=thin_bar_width, bar_thickness=bar_thickness,
+                            vertex_gap=vertex_gap, magnetisation=magnetisation)
+        test_asvi.square_staircase(Hc_thin, Hc_thick, Hc_std / 100, thick_bar_width)
+        test_asvi.fieldSweep(fieldType='Adaptive', Hmax=field_max, steps=Hsteps, Htheta=field_angle,
+                             n=neighbours, loops=loops, folder=folder, q1=False)
+        vc = load_summary(folder, output='vortex_count')
+        mc = load_summary(folder, output='macrospin_count')
+        plot_vortex_macrospin_number(vc, mc, 'exp', ax)
+        shutil.rmtree(folder)
+        sleep(1)
+        size += step
+    plt.show()
+
+
+def test_vortex_sig(maxsize = 20, step = 5):
+    size = 5
+    field_max = 0.02
+    folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir, 'ASVI_test_cache'))
+    fig, ax = plt.subplots()
+    while size <= maxsize:
+        test_asvi = asvi.ASVI(size, size, bar_length=bar_length, bar_width=thin_bar_width, bar_thickness=bar_thickness,
+                            vertex_gap=vertex_gap, magnetisation=magnetisation)
+        test_asvi.square_staircase_vortex(Hc_thin, Hc_thick, Hc_std / 100, thick_bar_width)
+        test_asvi.fieldSweep(fieldType='Linear', Hmax=field_max, steps=200, Htheta=field_angle,
+                             n=neighbours, loops=0, folder=folder, q1=False)
+        vc = load_summary(folder, output='vortex_count')
+        mc = load_summary(folder, output='macrospin_count')
+        plot_vortex_macrospin_number(vc, mc, 'sigmoid', ax)
+        shutil.rmtree(folder)
+        sleep(1)
+        size += step
+    plt.show()
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Running Simulation and output results
@@ -74,20 +112,23 @@ fps = 10    # Animation fps
 # Select what to perform in this run
 Simulate = False
 Animate = False
-Show_statistics = False
 Test = True
+
 if __name__ == '__main__':
     folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir, output_folder_name))
-    # Generate ASCI Class model
+    # Generate ASVI Class model
     lattice = asvi.ASVI(size, size, bar_length=bar_length, bar_width=thin_bar_width, bar_thickness=bar_thickness,
                         vertex_gap=vertex_gap, magnetisation=magnetisation)
     lattice.square_staircase(Hc_thin, Hc_thick, Hc_std / 100,thick_bar_width)
     if os.path.exists(folder) == False:
         os.mkdir(folder)
     if Simulate:
+        shutil.rmtree(folder)
         lattice.fieldSweep(fieldType = Field, Hmax = field_max, steps = Hsteps, Htheta = field_angle,
                            n = neighbours, loops = loops, folder = folder, q1 = False)
     if Animate:
         lattice.fieldSweepAnimation(folder, fps = fps)
     if Test:
-        test_sim_speed(maxsize=3, Hsteps=20, neighbours=2, loops=5)
+        #test_sim_speed(maxsize=3, Hsteps=20, neighbours=2, loops=5)
+        #test_vortex_exp(20, 5)
+        test_vortex_sig(20, 5)

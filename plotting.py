@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 from matplotlib.colors import BoundaryNorm, ListedColormap
 from scipy.optimize import curve_fit
@@ -24,31 +25,33 @@ def test_cmap(cmap):
     plt.show()
 
 
-def load_summary(file, output):
+def load_summary(folder, output):
     '''
         load in statistical summary from field sweep
     '''
-    assert 'ASVIStateInfo' in file  # only allow summary file input
-
-    if '.npz' not in file:
-        file = file + '.npz'
-    npzfile = np.load(file, allow_pickle=True)
-    parameters = npzfile['arr_0']
-    fieldloops = npzfile['arr_1']
-    q = npzfile['arr_2']
-    mag = npzfile['arr_3']
-    monopole = npzfile['arr_4']
-    vortex_count = npzfile['arr_5']
-    macrospin_count = npzfile['arr_6']
-    summary = {
-        'parameters': parameters,
-        'fieldloops': fieldloops,
-        'q': q,
-        'mag': mag,
-        'monopole': monopole,
-        'vortex_count': vortex_count,
-        'macrospin_count': macrospin_count
-    }.get(output, None)
+    summary = None
+    for root, dirs, files in os.walk(folder):
+        sum_files = list(filter(lambda x: 'ASVIStateInfo' in x, files))
+        for file in sum_files:
+            if '.npz' not in file:
+                file = file + '.npz'
+            npzfile = np.load(os.path.join(root, file), allow_pickle=True)
+            parameters = npzfile['arr_0']
+            fieldloops = npzfile['arr_1']
+            q = npzfile['arr_2']
+            mag = npzfile['arr_3']
+            monopole = npzfile['arr_4']
+            vortex_count = npzfile['arr_5']
+            macrospin_count = npzfile['arr_6']
+            summary = {
+                'parameters': parameters,
+                'fieldloops': fieldloops,
+                'q': q,
+                'mag': mag,
+                'monopole': monopole,
+                'vortex_count': vortex_count,
+                'macrospin_count': macrospin_count
+            }.get(output, None)
     return summary
 
 
@@ -65,47 +68,50 @@ def plot_applied_field(field):
     plt.show()
 
 
-def plot_vortex_macrospin_number(vortex_count, macrospin_count, fitfunc):
+def plot_vortex_macrospin_number(vortex_count, macrospin_count, fitfunc, ax=None):
     '''
     Plot the time evolution of vortex numbers and macrospin numbers
     '''
     assert len(vortex_count) == len(macrospin_count)
     assert 'exp' or 'sigmoid' in fitfunc
 
+    if ax is None:
+        fig, ax = plt.subplots()
+
     size = len(vortex_count)
     steps = np.arange(0, size, 1)
 
-    def exp_decay(x, a, b, c, d):
-        return a * np.exp(-b * x + c) + d
+    def exp_decay(x, a, b, c):
+        return a * np.exp(-b * x) + c
 
     def sigmoid(x, a, b, c, d):
-        return a / (1 + np.exp(-b * x + c)) + d
+        return (a / (1 + np.exp(-b * x + c))) + d
 
-    fig, ax = plt.subplots()
     if fitfunc == 'exp':
-        popt1, pcov1 = curve_fit(exp_decay, steps, vortex_count, p0=[np.max(vortex_count), 1, 1, 1])
+        popt1, pcov1 = curve_fit(exp_decay, steps, vortex_count,
+                                 p0=[-np.max(vortex_count), 1, np.max(vortex_count)])
         popt2, pcov2 = curve_fit(exp_decay, steps, macrospin_count,
-                                 p0=[np.max(macrospin_count) / 2, 1, np.max(macrospin_count) / 2, 1])
-        ax.plot(steps, exp_decay(steps, *popt1), 'r--', label='Nv fitted')
-        ax.plot(steps, exp_decay(steps, *popt2), 'b--', label='Nm fitted')
+                                 p0=[np.max(macrospin_count) / 2, 1, np.max(macrospin_count) / 2])
+        ax.plot(steps, exp_decay(steps, *popt1), 'r--', zorder=2)
+        ax.plot(steps, exp_decay(steps, *popt2), 'b--', zorder=2)
 
     if fitfunc == 'sigmoid':
-        popt1, pcov1 = curve_fit(sigmoid, steps, vortex_count, p0=[np.max(vortex_count), 1, 1, 1])
+        popt1, pcov1 = curve_fit(sigmoid, steps, vortex_count,
+                                 p0=[np.min(vortex_count)-np.max(vortex_count), 1, 5, np.max(vortex_count)])
         popt2, pcov2 = curve_fit(sigmoid, steps, macrospin_count,
-                                 p0=[np.max(macrospin_count) / 2, 1, np.max(macrospin_count) / 2, 1])
-        ax.plot(steps, sigmoid(steps, *popt1), 'r--', label='Nv fitted')
-        ax.plot(steps, sigmoid(steps, *popt2), 'b--', label='Nm fitted')
+                                 p0=[np.max(macrospin_count)-np.min(macrospin_count), 1, 5, np.min(macrospin_count)])
+        ax.plot(steps, sigmoid(steps, *popt1), 'r--', zorder=2)
+        ax.plot(steps, sigmoid(steps, *popt2), 'b--', zorder=2)
 
     ax.set_title('Evolution of Vortex and Macrospin Modes')
     ax.set_xlabel('steps')
     ax.set_ylabel('number of vortices')
     ax.set_xlim(0, size + 10)
     ax.set_ylim(0, np.max(macrospin_count) + 5)
-    ax.plot(steps, vortex_count, 'o', label='number of vortices (Nv)')
-    ax.plot(steps, macrospin_count, 'o', label='number of macrospins (Nm)')
+    ax.plot(steps, vortex_count, 'o', label='number of vortices (Nv)', zorder=1)
+    ax.plot(steps, macrospin_count, 'o', label='number of macrospins (Nm)', zorder=1)
     ax.legend()
     ax.grid()
-    plt.show()
 
 
 def plot_vector_field_2D(lattice, ax):
