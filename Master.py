@@ -1,5 +1,5 @@
 
-import ASVI_Class as asvi
+import asvi_models as asvi
 import shutil
 import matplotlib.pyplot as plt
 import os
@@ -12,7 +12,7 @@ reload(asvi)
 #-----------------------------------------------------------------------------------------------------------------------
 # Material & Lattice Parameters
 # Define the size of the lattice and material properties
-size = 5  ## Dimension of array
+size = 2  ## Dimension of array
 Hc_thin = 0.025  # Coercive Field (T)
 Hc_thick = 0.015
 Hc_Vortex = 0.020
@@ -29,7 +29,7 @@ magnetisation = 800e3  # Saturation magnetisation of material in A/m (permalloy 
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Simulation Parameters
-Field = 'Linear'  # Type of Field used to sweep the lattice
+Field = 'Sine'  # Type of Field used to sweep the lattice
 Hsteps = 20         # Number of steps between the minimum value of the coercive field
                     # and the maxium field specified above. Total number of steps in a
                     # minor loop is = (2*steps)
@@ -110,16 +110,16 @@ def test_vortex_sig(maxsize = 20, step = 5):
 output_folder_name = 'ASVI_Simulation_Output' # Simulation results export to 'output_folder_name' in the parent directory
 fps = 10    # Animation fps
 # Select what to perform in this run
-Simulate = False
+Simulate = True
 Animate = False
-Test = True
+Test = False
 
 if __name__ == '__main__':
     folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir, output_folder_name))
     # Generate ASVI Class model
     lattice = asvi.ASVI(size, size, bar_length=bar_length, bar_width=thin_bar_width, bar_thickness=bar_thickness,
                         vertex_gap=vertex_gap, magnetisation=magnetisation)
-    lattice.square_staircase(Hc_thin, Hc_thick, Hc_std / 100,thick_bar_width)
+    lattice.square(Hc_thin, Hc_std / 100)
     if os.path.exists(folder) == False:
         os.mkdir(folder)
     if Simulate:
@@ -131,4 +131,4 @@ if __name__ == '__main__':
     if Test:
         #test_sim_speed(maxsize=3, Hsteps=20, neighbours=2, loops=5)
         #test_vortex_exp(20, 5)
-        test_vortex_sig(20, 5)
+        test_vortex_sig(10, 5)
