@@ -43,14 +43,16 @@ def load_summary(folder, output):
             monopole = npzfile['arr_4']
             vortex_count = npzfile['arr_5']
             macrospin_count = npzfile['arr_6']
+            frequency = npzfile['arr_7']
             summary = {
-                'parameters': parameters,
-                'fieldloops': fieldloops,
-                'q': q,
-                'mag': mag,
-                'monopole': monopole,
-                'vortex_count': vortex_count,
-                'macrospin_count': macrospin_count
+                'parameters': np.asarray(parameters),
+                'fieldloops': np.asarray(fieldloops),
+                'q': np.asarray(q),
+                'mag': np.asarray(mag),
+                'monopole': np.asarray(monopole),
+                'vortex_count': np.asarray(vortex_count),
+                'macrospin_count': np.asarray(macrospin_count),
+                'FMR_frequency': np.asarray(frequency)
             }.get(output, None)
     return summary
 
@@ -136,7 +138,7 @@ def plot_vector_field_2D(lattice, ax):
     V = My * bar_l  # normalise vector
     Cv = lattice[:, :, 10].flatten()
     # sorting out colors and thicknesses
-    line_w = 4 * (bar_w > 100e-9) + 1
+    line_w = 4 * (bar_w > 150e-9) + 1
     line_rbg = np.arctan(Mx + My)
     color = cmap(norm(line_rbg))
     ax.quiver(X, Y, U, V, angles='xy', scale_units='xy', scale=1, pivot='mid', zorder=1,
@@ -149,12 +151,28 @@ def plot_vector_field_2D(lattice, ax):
     return ax
 
 
+def plot_FMR(FMR_frequency):
+
+    num_plots = len(FMR_frequency)
+    colormap = plt.cm.gist_ncar
+    plt.gca().set_prop_cycle(plt.cycler('color', plt.cm.jet(np.linspace(0, 1, num_plots))))
+
+    fig, ax = plt.subplots()
+    ax.set_title('FMR Spectrum')
+    ax.set_xlabel('Frequency (Hz)')
+    ax.set_ylabel('Occurrence (a.u.)')
+    for freq in FMR_frequency:
+        ax.hist(freq, bins='auto', histtype='step')
+    ax.grid()
+
+
 if __name__ == '__main__':
-    """
-    file = 'D:\ASI_MSci_Project\ASVI_Simulation_Output\ASVIStateInfo_Hmax0.030_steps100_Angle45_n2_Loops0.npz'
-    vc = load_summary(file, output='vortex_count')
-    mc = load_summary(file, output='macrospin_count')
-    fd = load_summary(file, output='fieldloops')
-    plot_applied_field(fd)
-    plot_vortex_macrospin_number(vc, mc, 'sigmoid')
-    """
+    folder = 'D:\ASI_MSci_Project\ASVI_Simulation_Output'
+    vc = load_summary(folder, output='vortex_count')
+    mc = load_summary(folder, output='macrospin_count')
+    fd = load_summary(folder, output='fieldloops')
+    FMR_f = load_summary(folder, output='FMR_frequency')
+    # plot_applied_field(fd)
+    # plot_vortex_macrospin_number(vc, mc, 'sigmoid')
+    print(FMR_f)
+    plot_FMR(FMR_f)

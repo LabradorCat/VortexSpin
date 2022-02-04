@@ -3,13 +3,14 @@ import copy
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as manimation
+import numpy.linalg
 from tqdm import tqdm
 from plotting import plot_vector_field_2D
-from ferromagnetic_objects import NanoBar, Vertex
+
 plt.rcParams['animation.ffmpeg_path'] = r'D:\ASI_MSci_Project\ffmpeg\bin\ffmpeg.exe'
 
 
-class ASVI():
+class ASVI:
     '''
     Artificial Spin Vortex Ice model to be performing field sweeps
 
@@ -37,12 +38,16 @@ class ASVI():
 
     # INITIALISATION
     def __init__(self, unit_cells_x=25, unit_cells_y=25, vertex_gap=1e-7,
-                 bar_length=220e-9, bar_thickness=25e-9, bar_width=80e-9, magnetisation=800e3,
-                 hc_m = 0.03, hc_v = 0.02, hc_std = 0.05, lattice = None):
-        # Material Parameters
-        self.lattice = lattice
+                 bar_length=220e-9, bar_thickness=25e-9, bar_width=80e-9,
+                 magnetisation=800e3):
+        # Lattice Parameters
+        self.unit_cells_x = unit_cells_x
+        self.unit_cells_y = unit_cells_y
+        self.unit_cell_len = (bar_length + vertex_gap) / 2
+        self.side_len_x = None  # The side length is now defined in the square lattice
+        self.side_len_y = None
         self.previous = None
-        self.lattice_type = None
+        self.type = None
         self.Hc = None
         self.Hc_thick = None
         self.Hc_vortex = None
@@ -52,11 +57,6 @@ class ASVI():
         self.bar_width = bar_width
         self.bar_thickness = bar_thickness
         self.magnetisation = magnetisation
-        self.unit_cells_x = unit_cells_x
-        self.unit_cells_y = unit_cells_y
-        self.unit_cell_len = (bar_length + vertex_gap) / 2
-        self.side_len_x = None  # The side length is now defined in the square lattice
-        self.side_len_y = None
         # Simulation Parameters
         self.interType = 'dumbbell'
         self.periodicBC = False
@@ -75,6 +75,58 @@ class ASVI():
         Clears the lattice
         '''
         self.lattice = None
+
+    def get_bar_length(self, x, y):
+        return  self.lattice[x, y, 7]
+
+    def get_bar_width(self, x, y):
+        return self.lattice[x, y, 8]
+
+    def get_bar_thickness(self, x, y):
+        return self.lattice[x, y, 9]
+
+    def set_vortex(self, x, y, lattice = None):
+        '''
+        Set a point in lattice to vortex
+        '''
+        Hc_vortex = 0.026
+        Hc_std = 0.01
+        if lattice is None:
+            lattice = self.lattice
+        lattice[x, y, 11] = 1
+        lattice[x, y, 3:6] = 0
+        lattice[x, y, 6] = np.random.normal(loc=Hc_vortex, scale=Hc_std * Hc_vortex, size=None)
+        return lattice
+
+    def set_macrospin(self, x, y, lattice = None):
+        '''
+            Set a point in lattice to macrospin
+        '''
+        Hc = self.Hc_thick
+        Hc_std = self.Hc_std
+        if lattice is None:
+            lattice = self.lattice
+        lattice[x, y, 11] = 0
+        lattice[x, y, 6] = np.random.normal(loc = Hc, scale = Hc_std * Hc, size = None)
+        if y % 2 == 0:
+            lattice[x, y, 3:6] = np.array([1., 0., 0.])
+        else:
+            lattice[x, y, 3:6] = np.array([0., 1., 0.])
+        return lattice
+
+    def get_unit_vector(self, x, y, negative = False, lattice = None):
+        if lattice is None:
+            lattice = self.lattice
+        if y % 2 == 0:
+            if negative:
+                return np.array([-1., 0., 0.])
+            else:
+                return np.array([1., 0., 0.])
+        else:
+            if negative:
+                return np.array([0., -1., 0.])
+            else:
+                return np.array([0., 1., 0.])
 
     # SAVE & LOAD FUNCTIONS
     def save(self, file, folder=os.getcwd()):
@@ -134,28 +186,23 @@ class ASVI():
         self.side_len_x = 2 * self.unit_cells_x + 1
         self.side_len_y = 2 * self.unit_cells_y + 1
         bar_l, bar_w, bar_t = self.bar_length, self.bar_width, self.bar_thickness
-
-        grid = []
+        grid = np.zeros((self.side_len_x, self.side_len_y, 14))
         for x in range(0, self.side_len_x):
-            grid.append([])
             for y in range(0, self.side_len_y):
                 xpos = x * self.unit_cell_len
                 ypos = y * self.unit_cell_len
                 if (x + y) % 2 != 0:
                     Hc = np.random.normal(loc=Hc_mean, scale=Hc_std * Hc_mean, size=None)
                     if y % 2 == 0:
-                        grid[x].append(NanoBar(xpos, ypos, 0., 1., 0., 0., Hc, bar_l, bar_w, bar_t))
+                        grid[x, y] = np.array([xpos, ypos, 0., 1., 0., 0., Hc, bar_l, bar_w, bar_t, None, 0, 0, 0])
                     else:
-                        grid[x].append(NanoBar(xpos, ypos, 0., 0., 1., 0., Hc, bar_l, bar_w, bar_t))
+                        grid[x, y] = np.array([xpos, ypos, 0., 0., 1., 0., Hc, bar_l, bar_w, bar_t, None, 0, 0, 0])
                 else:
                     if (x) % 2 == 0 and x != 0 and y != 0 and x != self.side_len_x - 1 and y != self.side_len_x - 1:
-                        grid[x].append(Vertex(xpos, ypos, 0., 0.))
+                        grid[x, y] = np.array([xpos, ypos, 0., 0., 0., 0., 0., None, None, None, 0, None, 0, 0])
                     else:
-                        grid[x].append(Vertex(xpos, ypos, 0., 0.))
+                        grid[x, y] = np.array([xpos, ypos, 0., 0., 0., 0., 0., None, None, None, None, None, 0, 0])
         self.lattice = grid
-        test = np.asarray(grid, dtype=object)
-        print(test)
-
 
     def square_staircase(self, Hc_thin=0.03, Hc_thick=0.015, Hc_std=0.05, thick_bar_w=80e-9):
         self.square(Hc_thin, Hc_std)
@@ -249,7 +296,8 @@ class ASVI():
         return field_steps
 
     # SIMULATION EXECUTABLES
-    def fieldSweep(self, fieldType, Hmax, steps, Htheta, n=10, loops=1, folder=None, q1=False):
+    def fieldSweep(self, fieldType, Hmax, steps, Htheta, n=10, loops=1, folder=None,
+                   FMR = False, FMR_field = None):
         '''
         Sweeps through the lattice using the designated field type.
         Total number of steps for a full minor loop is (2 * step).
@@ -262,8 +310,8 @@ class ASVI():
         # Determine which field type to sweep the lattice
         field_steps = {
             'Sine': self.SineField(Hmax, steps),
-            #'Adaptive': self.AdaptiveField(Hmax, steps),
-            #'Linear': self.LinearField(Hmax, steps)
+            'Adaptive': self.AdaptiveField(Hmax, steps),
+            'Linear': self.LinearField(Hmax, steps)
         }.get(fieldType, Exception('Field sweep type not defined'))
         # Working out field angle and amend field steps
         self.field_angle = Htheta
@@ -274,11 +322,9 @@ class ASVI():
             angleFactor = np.sin(Hrad)
         field_steps = field_steps / angleFactor
         # Create statistical parameters
-        q, mag, monopole, fieldloops, vortex_count, macrospin_count = (np.array([]) for i in range(6))
+        q, mag, monopole, fieldloops, frequency, vortex_count, macrospin_count = ([] for i in range(7))
         counter = 0
         i = 0
-        tcycles = 15
-        period = None
         # Start the field sweep
         print('STARTING SIMULATION WITH {} MINOR LOOPS...'.format(loops))
         self.relax(n=n)
@@ -291,76 +337,48 @@ class ASVI():
                 self.applied_field = field
                 Happlied = field * np.array([np.cos(Hrad), np.sin(Hrad), 0.])
                 self.relax(Happlied, n)
+                if FMR:
+                    freq = self.FMR(FMR_field, Htheta, n)
+                    frequency.append(freq)
                 # saving statistical data
-                fieldloops = np.append(fieldloops, field)
-                q = np.append(q, self.correlation(self.previous, self))
-                mag = np.append(mag, self.netMagnetisation())
-                monopole = np.append(monopole, self.monopoleDensity())
-                vortex_count = np.append(vortex_count, self.count_vortex())
-                macrospin_count = np.append(macrospin_count, self.count_macrospin())
+                q.append(self.correlation(self.previous, self))
+                mag.append(self.netMagnetisation())
+                monopole.append(self.monopoleDensity())
+                fieldloops.append(field)
+                vortex_count.append(self.count_vortex())
+                macrospin_count.append(self.count_macrospin())
                 self.save('ASVIcounter{}_Loop{}_FieldApplied{:.3f}_Angle{:.0f}'.format(
                     counter, i, field, Htheta), folder=folder)
                 counter += 1
-            if q1 == True and period == None:
-                finalfield = abs(field)
-                namestr = '%(finalfield)e_A' % locals()
-                print(namestr)
-                period = self.determinePeriod(folder, Hmax=namestr.replace('.', 'p'))
-                print('period:', period)
-                if period != None:
-                    loops = i + period
-                    tcycles = i
             i += 1
         self.save('FinalASVI_Hmax{:.3f}_steps{}_Angle{:.0f}_n{}_Loops{}'.format(
                    Hmax, steps, Htheta, n, loops), folder=folder)
         # Saving statistical information
         file = 'ASVIStateInfo_Hmax{:.3f}_steps{}_Angle{:.0f}_n{}_Loops{}'.format(Hmax, steps, Htheta, n, loops)
-        parameters = np.array([Hmax, steps, Htheta, n, loops, self.Hc, self.Hc_std, period, tcycles])
+        parameters = np.array([Hmax, steps, Htheta, n, loops, self.Hc, self.Hc_std])
         if folder == None:
             folder = os.getcwd()
-        np.savez(os.path.join(folder, file), parameters, fieldloops, q, mag, monopole, vortex_count, macrospin_count)
+        np.savez(os.path.join(folder, file), parameters, fieldloops, q, mag, monopole, vortex_count, macrospin_count,
+                 frequency)
         print('SIMULATION COMPLETE!')
 
-    def relax(self, Happlied=np.array([0., 0., 0.]), n=10):
-        '''
-        Steps through all the the positions in the lattice and if the field applied along the direction
-        of the bar is negative and greater than the coercive field then it switches the magnetisation
-        of the bar
-        '''
+    def FMR(self, field=-0.0012, theta=45, n=5):
+        rad = np.deg2rad(theta)
+        Happlied = field * np.array([np.cos(rad), np.sin(rad), 0.])
         grid = copy.deepcopy(self.lattice)
-        unrelaxed = True
-        flipcount = 0
-        print(grid[:, :, 7])
-        Xpos, Ypos = np.where(grid[:, :, 7] != 1)
+        Xpos, Ypos = np.where(grid[:, :, 6] != 0)
         positions = np.array(list(zip(Xpos, Ypos)))
 
-        while unrelaxed == True:
-            positions_new = np.random.permutation(positions)
-            for pos in positions_new:
-                x = pos[0]
-                y = pos[1]
-                bar = grid[x, y]
-
-                if bar.get_type() == 'macrospin':     # test if object is a macrospin
-                    unit_vector = bar.uni_vector()
-                    field = np.dot(np.array(Happlied + self.Hlocal(x, y, n=n)), unit_vector)
-                    if field < -bar.hc():
-                        if np.random.random() <= self.vortex_prob(x, y):
-                            bar.set_vortex()
-                        else:
-                            bar.flip()
-                            flipcount += 1
-
-                elif bar.type == 'vortex':   # test if object is a vortex
-                    unit_vector = bar.uni_vector()
-                    field = np.dot(np.array(Happlied + self.Hlocal(x, y, n=n)), unit_vector)
-                    if field < -bar.hc():
-                        bar.set_macrospin()
-            if flipcount > 0:
-                unrelaxed = True
-            else:
-                unrelaxed = False
-            self.lattice = grid
+        freq = []
+        for pos in positions:
+            x = pos[0]
+            y = pos[1]
+            unit_vector = grid[x, y, 3:6]
+            B = np.dot(np.array(Happlied + self.Hlocal(x, y, n=n)), unit_vector)
+            M = self.magnetisation
+            frequency = (2/2*np.pi)*np.sqrt(B * (B + 4*np.pi*10e-7*M))
+            freq.append(frequency)
+        return np.array(freq)
 
     def fieldSweepAnimation(self, folder, fps = 10):
         '''
@@ -402,6 +420,53 @@ class ASVI():
         print('ANIMATION COMPLETE!')
 
     # CALCULATIONS
+    def relax(self, Happlied=np.array([0., 0., 0.]), n=10):
+        '''
+        Steps through all the the positions in the lattice and if the field applied along the direction
+        of the bar is negative and greater than the coercive field then it switches the magnetisation
+        of the bar
+        '''
+        grid = copy.deepcopy(self.lattice)
+        unrelaxed = True
+        Happlied[Happlied == -0.] = 0.
+        Xpos, Ypos = np.where(grid[:, :, 6] != 0)
+        positions = np.array(list(zip(Xpos, Ypos)))
+
+        while unrelaxed == True:
+            flipcount = 0
+            vortexcount = 0
+            positions_new = np.random.permutation(positions)
+            for pos in positions_new:
+                x = pos[0]
+                y = pos[1]
+                if grid[x, y, 11] == 0:  # test if object is a macrospin
+                    if abs(grid[x, y, 6]) != 0:
+                        unit_vector = grid[x, y, 3:6]
+                        field = np.dot(np.array(Happlied + self.Hlocal(x, y, n=n)), unit_vector)
+                        if field < -grid[x, y, 6]:
+                            if np.random.random() <= self.vortex_prob(x, y):
+                                grid = self.set_vortex(x, y, grid)
+                                grid[x, y, 13] += 1
+                                vortexcount += 1
+                            else:
+                                grid[x, y, 3:6] = np.negative(grid[x, y, 3:6])
+                                grid[x, y, 12] += 1
+                                flipcount += 1
+                elif grid[x, y, 11] == 1:  # test if object is a vortex
+                    if abs(grid[x, y, 6]) != 0:
+                        is_neg = Happlied<0
+                        unit_vector = self.get_unit_vector(x, y, is_neg[0], grid)
+                        field = np.dot(np.array(Happlied + self.Hlocal(x, y, n=n)), unit_vector)
+                        if field < -grid[x, y, 6]:
+                            grid = self.set_macrospin(x, y, grid)
+
+            grid[grid == -0.] = 0.
+            if flipcount > 0:
+                unrelaxed = True
+            else:
+                unrelaxed = False
+            self.lattice = grid
+
     def count_vortex(self):
         '''
         Count the number of vortices in the lattice
@@ -551,63 +616,54 @@ class ASVI():
             if y2 > self.side_len_y - 1:
                 y2 = self.side_len_y - 1
 
-            bar = self.lattice[x, y]
-            r0 = bar.pos()
-            grid = self.lattice[x1:x2, y1:y2]
-            xpos, ypos = np.where(grid.type() != 'vertex')
-            positions = np.array(list(zip(xpos, ypos)))
+            grid = self.lattice[x1:x2, y1:y2, :]
+            m = grid[:, :, 3:6]
+            m = m.reshape(-1, m.shape[-1])
+            r = grid[:, :, 0:3]
+            r = r.reshape(-1, r.shape[-1])
+            r0 = self.lattice[x, y, 0:3]
 
+            for pos, mag in zip(r, m):
+                if np.linalg.norm(pos - r0) / (n + 1) <= 1.0 and np.array_equal(pos, r0) != True:
+                    Hl.append(self.fieldCalc(x, y, mag, r0, pos))
+            return sum(Hl)
 
-            for pos in positions:
-                xp = pos[0]
-                yp = pos[1]
-                bar_other = grid[xp, yp]
-                r = bar_other.pos()
-                if np.linalg.norm(r - r0) / (n + 1) <= 1.0 and np.array_equal(r, r0) != True:
-                    Hl.append(self.fieldCalc(bar, bar_other))
-
-            # m = grid[:, :, 3:6]
-            # m = m.reshape(-1, m.shape[-1])
-            # r = grid[:, :, 0:3]
-            # r = r.reshape(-1, r.shape[-1])
-            # for pos, mag in zip(r, m):
-            #     if np.linalg.norm(pos - r0) / (n + 1) <= 1.0 and np.array_equal(pos, r0) != True:
-            #         Hl.append(self.fieldCalc(mag, r0, pos))
-
-            return (sum(Hl))
-
-    def fieldCalc(self, bar1, bar2):
+    def fieldCalc(self, x, y, mag, r0, pos):
         '''
         Tells the class what type of field calculation method
         you want to use for the rest of the simulation
         '''
-        mag = bar2.mag()
-        pos = bar2.pos()
-        r0 = bar1.pos()
-        bar_l, bar_w, bar_t = bar1.bar_l, bar1.bar_w, bar1.bar_t
-        magnetisation = self.magnetisation
+        bar_length = self.get_bar_length(x, y)
+        bar_width = self.get_bar_width(x, y)
+        bar_thickness = self.get_bar_thickness(x, y)
         if self.interType == 'dipole':
             # Calculate a field in point r created by a dipole moment m located in r0.
             # Spatial components are the outermost axis of r and returned B.
-            mag_charge = magnetisation * bar_l * bar_w * bar_t * mag
+            mag = np.array(mag)
+            r0 = np.array(r0)
+            pos = np.array(pos)
+            mag = self.magnetisation * bar_length * bar_width * bar_thickness * mag
             # we use np.subtract to allow r0 and pos to be a python lists, not only np.array
             R = np.subtract(np.transpose(r0), pos).T
             # assume that the spatial components of r are the outermost axis
             norm_R = np.sqrt(np.einsum("i...,i...", R, R))
             # calculate the dot product only for the outermost axis,
             # that is the spatial components
-            m_dot_R = np.tensordot(mag_charge, R, axes=1)
+            m_dot_R = np.tensordot(mag, R, axes=1)
             # tensordot with axes=0 does a general outer product - we want no sum
-            B = 1e-7 * 3 * m_dot_R * R / norm_R ** 5 - np.tensordot(mag_charge, 1 / norm_R ** 3, axes=0)
+            B = 1e-7 * 3 * m_dot_R * R / norm_R ** 5 - np.tensordot(mag, 1 / norm_R ** 3, axes=0)
             # include the physical constant
-            return (B)
+            return B
         if self.interType == 'dumbbell':
             # Using the dumbbell model to calculate the interaction between each bar
-            mag_charge = bar_t * magnetisation * bar_w
-            r2 = np.subtract(np.transpose(r0), pos).T + mag * bar_l / 2
-            r1 = np.subtract(np.transpose(r0), pos).T - mag * bar_l / 2
+            mag = np.array(mag)
+            r0 = np.array(r0)
+            pos = np.array(pos)
+            mag_charge = bar_thickness * self.magnetisation * bar_width
+            r2 = np.subtract(np.transpose(r0), pos).T + mag * bar_length / 2
+            r1 = np.subtract(np.transpose(r0), pos).T - mag * bar_length / 2
             B = 1e-7 * mag_charge * (r1 / np.linalg.norm(r1) ** 3 - r2 / np.linalg.norm(r2) ** 3)
-            return (B)
+            return B
 
     def vertexCharge(self):
         '''
@@ -699,8 +755,8 @@ class ASVI():
         # filenames_neg.sort(key = self.sortFunc2)
         filenames_neg.sort(key=lambda s: os.path.getmtime(s))
         print(filenames_pos, filenames_neg)
-        for i, file_pos, file_neg in zip(np.arange(0, len(filenames_neg)), reverse(filenames_pos),
-                                         reverse(filenames_neg)):
+        for i, file_pos, file_neg in zip(np.arange(0, len(filenames_neg)), reversed(filenames_pos),
+                                         reversed(filenames_neg)):
             if i == 0:
                 self.load(file_pos)
                 latticelist_pos.append(self.returnLattice())

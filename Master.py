@@ -1,5 +1,3 @@
-
-import asvi_models as asvi
 import shutil
 import matplotlib.pyplot as plt
 import os
@@ -7,34 +5,34 @@ import numpy as np
 from importlib import *
 from time import time, sleep
 from plotting import plot_vortex_macrospin_number, load_summary
+from asvi import ASVI
 
-reload(asvi)
+#reload(asvi)
 #-----------------------------------------------------------------------------------------------------------------------
 # Material & Lattice Parameters
 # Define the size of the lattice and material properties
-size = 2  ## Dimension of array
-Hc_thin = 0.025  # Coercive Field (T)
-Hc_thick = 0.015
-Hc_Vortex = 0.020
-Hc_std = 2  # Stanard deviation in the coercive field (as a percentage)
-bar_length = 400e-9  # Bar length in m
+size = 5  ## Dimension of array
+Hc_thin = 0.029  # Coercive Field (T)
+Hc_thick = 0.01625
+Hc_Vortex = 0.026
+Hc_std = 1.5  # Stanard deviation in the coercive field (as a percentage)
 vertex_gap = 100e-9  # Vertex gap in m
-bar_thickness = 20.5e-9  # Bar thickness in m
-thin_bar_width = 100e-9  # Bar width in m
+bar_length = 600e-9  # Bar length in m
+bar_thickness = 20e-9  # Bar thickness in m
+thin_bar_width = 125e-9  # Bar width in m
 thick_bar_width = 200e-9
 magnetisation = 800e3  # Saturation magnetisation of material in A/m (permalloy is 80e3)
 field_angle = 45.  # Angle at which the field will be applied in degrees
-field_max = 0.0192  # Maximum field to by applied at field angle measured in Telsa
-magnetisation = 800e3  # Saturation magnetisation of material in A/m (permalloy is 80e3)
+field_max = 0.0235  # Maximum field to by applied at field angle measured in Telsa
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Simulation Parameters
-Field = 'Sine'  # Type of Field used to sweep the lattice
+Field = 'Adaptive'  # Type of Field used to sweep the lattice
 Hsteps = 20         # Number of steps between the minimum value of the coercive field
                     # and the maxium field specified above. Total number of steps in a
                     # minor loop is = (2*steps)
 neighbours = 2      # The radius of neighbouring spins that are included in the local field calculation
-loops = 10          # The number of minor field loops to be done
+loops = 5         # The number of minor field loops to be done
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Benchmarking Functions
@@ -111,21 +109,21 @@ output_folder_name = 'ASVI_Simulation_Output' # Simulation results export to 'ou
 fps = 10    # Animation fps
 # Select what to perform in this run
 Simulate = True
-Animate = False
+Animate = True
 Test = False
 
 if __name__ == '__main__':
     folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir, output_folder_name))
     # Generate ASVI Class model
-    lattice = asvi.ASVI(size, size, bar_length=bar_length, bar_width=thin_bar_width, bar_thickness=bar_thickness,
+    lattice = ASVI(size, size, bar_length=bar_length, bar_width=thin_bar_width, bar_thickness=bar_thickness,
                         vertex_gap=vertex_gap, magnetisation=magnetisation)
-    lattice.square(Hc_thin, Hc_std / 100)
+    lattice.square_staircase(Hc_thin, Hc_thick, Hc_std / 100, thick_bar_width)
     if os.path.exists(folder) == False:
         os.mkdir(folder)
     if Simulate:
         shutil.rmtree(folder)
         lattice.fieldSweep(fieldType = Field, Hmax = field_max, steps = Hsteps, Htheta = field_angle,
-                           n = neighbours, loops = loops, folder = folder, q1 = False)
+                           n = neighbours, loops = loops, folder = folder, FMR=True, FMR_field=-0.0012)
     if Animate:
         lattice.fieldSweepAnimation(folder, fps = fps)
     if Test:
