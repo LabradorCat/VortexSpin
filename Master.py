@@ -32,7 +32,7 @@ Hsteps = 20         # Number of steps between the minimum value of the coercive 
                     # and the maxium field specified above. Total number of steps in a
                     # minor loop is = (2*steps)
 neighbours = 2      # The radius of neighbouring spins that are included in the local field calculation
-loops = 5         # The number of minor field loops to be done
+loops = 4         # The number of minor field loops to be done
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Benchmarking Functions
@@ -108,7 +108,7 @@ def test_vortex_sig(maxsize = 20, step = 5):
 output_folder_name = 'ASVI_Simulation_Output' # Simulation results export to 'output_folder_name' in the parent directory
 fps = 10    # Animation fps
 # Select what to perform in this run
-Simulate = True
+Simulate = False
 Animate = True
 Test = False
 
@@ -125,8 +125,9 @@ if __name__ == '__main__':
         lattice.fieldSweep(fieldType = Field, Hmax = field_max, steps = Hsteps, Htheta = field_angle,
                            n = neighbours, loops = loops, folder = folder, FMR=True, FMR_field=-0.0012)
     if Animate:
-        lattice.fieldSweepAnimation(folder, fps = fps)
+        lattice.FMRAnimation(folder, fps = fps)
     if Test:
+        pass
         #test_sim_speed(maxsize=3, Hsteps=20, neighbours=2, loops=5)
         #test_vortex_exp(20, 5)
-        test_vortex_sig(10, 5)
+        #test_vortex_sig(10, 5)

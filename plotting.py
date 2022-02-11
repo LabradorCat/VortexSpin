@@ -1,7 +1,9 @@
 import numpy as np
 import os
+import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib.colors import BoundaryNorm, ListedColormap
+from matplotlib.colors import BoundaryNorm, ListedColormap, Normalize
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.optimize import curve_fit
 
 # Our customized Colormap
@@ -9,8 +11,8 @@ clist = list('bkr')
 clist = ['#ff0000' if c == 'r' else c for c in clist]
 clist = ['#0000ff' if c == 'b' else c for c in clist]
 clist = ['#000000' if c == 'k' else c for c in clist]
-cmap = ListedColormap(clist)
-norm = BoundaryNorm([-1, -0.5, 0.5, 1], cmap.N)
+mycmap = ListedColormap(clist)
+mynorm = BoundaryNorm([-1, -0.5, 0.5, 1], mycmap.N)
 
 
 def test_cmap(cmap):
@@ -116,7 +118,7 @@ def plot_vortex_macrospin_number(vortex_count, macrospin_count, fitfunc, ax=None
     ax.grid()
 
 
-def plot_vector_field_2D(lattice, ax):
+def plot_vector_field_2D(lattice, fig, ax, color = None):
     """
     Return a vector field according to the input lattice
     Represented elements include:
@@ -139,8 +141,12 @@ def plot_vector_field_2D(lattice, ax):
     Cv = lattice[:, :, 10].flatten()
     # sorting out colors and thicknesses
     line_w = 4 * (bar_w > 150e-9) + 1
-    line_rbg = np.arctan(Mx + My)
-    color = cmap(norm(line_rbg))
+    if color is None:
+        line_rbg = np.arctan(Mx + My)
+        color = mycmap(norm(line_rbg))
+    cmap = plt.get_cmap('plasma')
+    norm = Normalize(vmin=2, vmax=11)
+    color = cmap(norm(color))
     ax.quiver(X, Y, U, V, angles='xy', scale_units='xy', scale=1, pivot='mid', zorder=1,
               linewidths=line_w, color=color, edgecolors=color)
     ax.scatter(X, Y, s=50, c=Cv, cmap='gist_rainbow', marker='o', zorder=2, vmax=1, vmin=-1)
@@ -148,6 +154,12 @@ def plot_vector_field_2D(lattice, ax):
     ax.set_ylabel('Ly (m)')
     ax.ticklabel_format(style='sci', scilimits=(0, 0))
     ax.use_sticky_edges = False
+    # make a color bar for FMR
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), cax=cax, orientation='vertical',
+                 label='FMR frequency (GHz)')
+
     return ax
 
 
@@ -161,18 +173,41 @@ def plot_FMR(FMR_frequency):
     ax.set_title('FMR Spectrum')
     ax.set_xlabel('Frequency (Hz)')
     ax.set_ylabel('Occurrence (a.u.)')
+    loop = 0
     for freq in FMR_frequency:
-        ax.hist(freq, bins='auto', histtype='step')
-    ax.grid()
+        ax.hist(freq, bins=30, histtype='step', label=f'loop {loop}')
+        loop += 1
+    ax.legend(loc='upper left')
 
+
+def FMR_heatmap(type=0, field=0, display_FMR_heatmap=False):
+    if display_FMR_heatmap:
+        uH = np.linspace(-10, 10, 100)
+        plt.figure('FMR_heatmap', figsize=(3,3))
+        plt.xlabel('uH(mT)')
+        plt.xlim(-10, 10)
+        plt.ylabel('frequency (GHz)')
+        plt.ylim(2, 11)
+        plt.plot(uH, FMR_heatmap(0, uH))
+        plt.plot(uH, FMR_heatmap(1, uH))
+        plt.plot(uH, FMR_heatmap(2, uH))
+        plt.grid()
+        plt.show()
+    else:
+        if type == 0:  # thin bar
+            return -0.035 * field + 8.7
+        if type == 1:  # thick bar
+            return -0.035 * field + 6.9
+        if type == 2:  # vortex
+            return -1.86 * np.tanh(0.2 * field) + 4.5
 
 if __name__ == '__main__':
     folder = 'D:\ASI_MSci_Project\ASVI_Simulation_Output'
-    vc = load_summary(folder, output='vortex_count')
-    mc = load_summary(folder, output='macrospin_count')
-    fd = load_summary(folder, output='fieldloops')
+    # vc = load_summary(folder, output='vortex_count')
+    # mc = load_summary(folder, output='macrospin_count')
+    # fd = load_summary(folder, output='fieldloops')
     FMR_f = load_summary(folder, output='FMR_frequency')
     # plot_applied_field(fd)
     # plot_vortex_macrospin_number(vc, mc, 'sigmoid')
-    print(FMR_f)
+    FMR_heatmap(display_FMR_heatmap=True)
     plot_FMR(FMR_f)

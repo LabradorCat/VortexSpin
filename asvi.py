@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as manimation
 import numpy.linalg
 from tqdm import tqdm
-from plotting import plot_vector_field_2D
+from plotting import plot_vector_field_2D, FMR_heatmap
 
 plt.rcParams['animation.ffmpeg_path'] = r'D:\ASI_MSci_Project\ffmpeg\bin\ffmpeg.exe'
 
@@ -327,6 +327,10 @@ class ASVI:
         i = 0
         # Start the field sweep
         print('STARTING SIMULATION WITH {} MINOR LOOPS...'.format(loops))
+        if FMR:
+            #freq = self.FMR(FMR_field, Htheta, n)
+            freq = self.FMR_HM(n)
+            frequency.append(freq)
         self.relax(n=n)
         self.save('InitialASVI_Hmax{:.3f}_steps{}_Angle{:.0f}_n{}_Loops{}'.format(
                    Hmax, steps, Htheta, n, loops), folder=folder)
@@ -337,9 +341,6 @@ class ASVI:
                 self.applied_field = field
                 Happlied = field * np.array([np.cos(Hrad), np.sin(Hrad), 0.])
                 self.relax(Happlied, n)
-                if FMR:
-                    freq = self.FMR(FMR_field, Htheta, n)
-                    frequency.append(freq)
                 # saving statistical data
                 q.append(self.correlation(self.previous, self))
                 mag.append(self.netMagnetisation())
@@ -350,6 +351,10 @@ class ASVI:
                 self.save('ASVIcounter{}_Loop{}_FieldApplied{:.3f}_Angle{:.0f}'.format(
                     counter, i, field, Htheta), folder=folder)
                 counter += 1
+            if FMR:
+                #freq = self.FMR(FMR_field, Htheta, n)
+                freq = self.FMR_HM(n)
+                frequency.append(freq)
             i += 1
         self.save('FinalASVI_Hmax{:.3f}_steps{}_Angle{:.0f}_n{}_Loops{}'.format(
                    Hmax, steps, Htheta, n, loops), folder=folder)
@@ -361,6 +366,26 @@ class ASVI:
         np.savez(os.path.join(folder, file), parameters, fieldloops, q, mag, monopole, vortex_count, macrospin_count,
                  frequency)
         print('SIMULATION COMPLETE!')
+
+    def FMR_HM(self, n=5):
+        grid = copy.deepcopy(self.lattice)
+        Xpos, Ypos = np.where(grid[:, :, 6] != 0)
+        positions = np.array(list(zip(Xpos, Ypos)))
+
+        freq = []
+        for pos in positions:
+            x = pos[0]
+            y = pos[1]
+            if grid[x, y, 11] == True:
+                type = 2
+            elif self.get_bar_width(x, y) > 150e-9:
+                type = 1
+            else:
+                type = 0
+            B = 1000 * np.linalg.norm(self.Hlocal(x, y, n=n))   # convert to mT
+            frequency = FMR_heatmap(type = type, field = B)
+            freq.append(frequency)
+        return np.array(freq)
 
     def FMR(self, field=-0.0012, theta=45, n=5):
         rad = np.deg2rad(theta)
@@ -379,6 +404,46 @@ class ASVI:
             frequency = (2/2*np.pi)*np.sqrt(B * (B + 4*np.pi*10e-7*M))
             freq.append(frequency)
         return np.array(freq)
+
+    def FMRAnimation(self, folder, fps=10):
+        """
+        Produce an animation of the lattice with frequency of each bar as it goes through the field loop
+        just provide the folder where the field sweeps are saved
+        """
+        print('STARTING TO MAKE ANIMATION...')
+        FFMpegWriter = manimation.writers['ffmpeg']
+        metadata = dict(title='ASVI FMR Simulation', artist='Matplotlib',
+                        comment='Artificial Spin Vortex Ice Simulation')
+        writer = FFMpegWriter(fps=fps, metadata=metadata)
+        fig, ax = plt.subplots(figsize=(8, 8), constrained_layout=True)
+
+        def sortFunc(element):
+            begin = element.find('counter') + 7
+            end = element.find('_Loop')
+            return (int(element[begin:end]))
+
+        with writer.saving(fig, (os.path.join(folder, "animation.mp4")), 100):
+            for root, dirs, files in os.walk(folder):
+                new_files = list(filter(lambda x: 'ASVIcounter' in x, files))
+                new_files.sort(key=sortFunc)
+                for file in tqdm(new_files, desc='Animation Progress: ', unit='frame'):
+                    ax.clear()
+                    self.clearLattice()
+                    self.load(os.path.join(root, file))
+                    self.vertexCharge()
+                    freq = self.FMR_HM()
+                    grid = copy.deepcopy(self.lattice)
+                    # plotting vector field
+                    ax = plot_vector_field_2D(grid, fig, ax, color = freq)
+                    # setting title
+                    H_applied = np.round(1000 * self.applied_field, 2)
+                    H_theta = self.field_angle
+                    steps = file[file.find('counter') + 7:file.find(r'_Loop')]
+                    ax.set_title("Steps: " + steps, loc='left', pad=20)
+                    ax.set_title('Applied Field: {} mT, Field Angle = {} deg'.format(H_applied, H_theta),
+                                 loc='right', pad=20)
+                    writer.grab_frame()
+        print('ANIMATION COMPLETE!')
 
     def fieldSweepAnimation(self, folder, fps = 10):
         '''
@@ -401,6 +466,7 @@ class ASVI:
             for root, dirs, files in os.walk(folder):
                 new_files = list(filter(lambda x: 'ASVIcounter' in x, files))
                 new_files.sort(key=sortFunc)
+                print(new_files)
                 for file in tqdm(new_files, desc='Animation Progress: ', unit='frame'):
                     ax.clear()
                     self.clearLattice()
