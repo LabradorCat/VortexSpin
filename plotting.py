@@ -143,7 +143,7 @@ def plot_vector_field_2D(lattice, fig, ax, color = None):
     line_w = 4 * (bar_w > 150e-9) + 1
     if color is None:
         line_rbg = np.arctan(Mx + My)
-        color = mycmap(norm(line_rbg))
+        color = mycmap(mynorm(line_rbg))
     cmap = plt.get_cmap('plasma')
     norm = Normalize(vmin=2, vmax=11)
     color = cmap(norm(color))
@@ -200,6 +200,7 @@ def FMR_heatmap(type=0, field=0, display_FMR_heatmap=False):
             return -0.035 * field + 6.9
         if type == 2:  # vortex
             return -1.86 * np.tanh(0.2 * field) + 4.5
+
 
 if __name__ == '__main__':
     folder = 'D:\ASI_MSci_Project\ASVI_Simulation_Output'
