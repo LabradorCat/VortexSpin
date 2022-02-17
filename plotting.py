@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import BoundaryNorm, ListedColormap, Normalize
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.optimize import curve_fit
+from scipy.stats import gaussian_kde
+from sklearn.neighbors import KernelDensity
 
 # Our customized Colormap
 clist = list('bkr')
@@ -163,19 +165,40 @@ def plot_vector_field_2D(lattice, fig, ax, color = None):
     return ax
 
 
-def plot_FMR(FMR_frequency):
+def plot_FMR(FMR_frequency, fig=None, ax=None):
 
+    if fig is None or ax is None:
+        fig, ax = plt.subplots()
+
+    def kde_sklearn(x, x_grid, bandwidth=0.2, **kwargs):
+        """Kernel Density Estimation with Scikit-learn"""
+        kde_skl = KernelDensity(bandwidth=bandwidth, **kwargs)
+        kde_skl.fit(x[:, np.newaxis])
+        # score_samples() returns the log-likelihood of the samples
+        log_pdf = kde_skl.score_samples(x_grid[:, np.newaxis])
+        return np.exp(log_pdf)
+    # Setting color code
     num_plots = len(FMR_frequency)
-    colormap = plt.cm.gist_ncar
-    plt.gca().set_prop_cycle(plt.cycler('color', plt.cm.jet(np.linspace(0, 1, num_plots))))
-
-    fig, ax = plt.subplots()
+    #colormap = plt.cm.gist_ncar
+    #plt.gca().set_prop_cycle(plt.cycler('color', plt.cm.jet(np.linspace(0, 1, num_plots))))
+    offset = 2
+    f_max = np.max(FMR_frequency) + offset
+    f_min = np.min(FMR_frequency) - offset
+    f_arr = np.arange(f_min, f_max, 0.01)
+    # Plotting
     ax.set_title('FMR Spectrum')
     ax.set_xlabel('Frequency (Hz)')
     ax.set_ylabel('Occurrence (a.u.)')
     loop = 0
-    for freq in FMR_frequency:
-        ax.hist(freq, bins=30, histtype='step', label=f'loop {loop}')
+    for i in range(0, num_plots):
+        freq = FMR_frequency[i]
+        f_pdf = kde_sklearn(freq, f_arr, bandwidth=0.2)
+        if i == 0:
+            ax.plot(f_arr, f_pdf, label='Initial', color = 'blue', linewidth=2, alpha=1)
+        elif i == num_plots - 1:
+            ax.plot(f_arr, f_pdf, label='Final', color='red', linewidth=2, alpha=1)
+        else:
+            ax.plot(f_arr, f_pdf, label=f'loop {loop}', linewidth=3, alpha=0.5)
         loop += 1
     ax.legend(loc='upper left')
 
@@ -210,5 +233,5 @@ if __name__ == '__main__':
     FMR_f = load_summary(folder, output='FMR_frequency')
     # plot_applied_field(fd)
     # plot_vortex_macrospin_number(vc, mc, 'sigmoid')
-    FMR_heatmap(display_FMR_heatmap=True)
+    #FMR_heatmap(display_FMR_heatmap=True)
     plot_FMR(FMR_f)
