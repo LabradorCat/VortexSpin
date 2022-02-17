@@ -109,7 +109,7 @@ output_folder_name = 'ASVI_Simulation_Output' # Simulation results export to 'ou
 fps = 10    # Animation fps
 # Select what to perform in this run
 Simulate = False
-Animate = True
+Animate = False
 Test = False
 
 if __name__ == '__main__':
@@ -125,7 +125,7 @@ if __name__ == '__main__':
         lattice.fieldSweep(fieldType = Field, Hmax = field_max, steps = Hsteps, Htheta = field_angle,
                            n = neighbours, loops = loops, folder = folder, FMR=True, FMR_field=-0.0012)
     if Animate:
-        lattice.FMRAnimation(folder, fps = fps)
+        lattice.fieldSweepAnimation(folder, fps = fps)
     if Test:
         pass
         #test_sim_speed(maxsize=3, Hsteps=20, neighbours=2, loops=5)
