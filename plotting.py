@@ -146,9 +146,10 @@ def plot_vector_field_2D(lattice, fig, ax, color = None):
     if color is None:
         line_rbg = np.arctan(Mx + My)
         color = mycmap(mynorm(line_rbg))
-    cmap = plt.get_cmap('plasma')
-    norm = Normalize(vmin=2, vmax=11)
-    color = cmap(norm(color))
+    else:
+        cmap = plt.get_cmap('plasma')
+        norm = Normalize(vmin=2, vmax=11)
+        color = cmap(norm(color))
     ax.quiver(X, Y, U, V, angles='xy', scale_units='xy', scale=1, pivot='mid', zorder=1,
               linewidths=line_w, color=color, edgecolors=color)
     ax.scatter(X, Y, s=50, c=Cv, cmap='gist_rainbow', marker='o', zorder=2, vmax=1, vmin=-1)
@@ -157,11 +158,10 @@ def plot_vector_field_2D(lattice, fig, ax, color = None):
     ax.ticklabel_format(style='sci', scilimits=(0, 0))
     ax.use_sticky_edges = False
     # make a color bar for FMR
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), cax=cax, orientation='vertical',
-                 label='FMR frequency (GHz)')
-
+    # divider = make_axes_locatable(ax)
+    # cax = divider.append_axes("right", size="5%", pad=0.05)
+    # fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), cax=cax, orientation='vertical',
+    #              label='FMR frequency (GHz)')
     return ax
 
 
@@ -192,13 +192,16 @@ def plot_FMR(FMR_frequency, fig=None, ax=None):
     loop = 0
     for i in range(0, num_plots):
         freq = FMR_frequency[i]
-        f_pdf = kde_sklearn(freq, f_arr, bandwidth=0.2)
+        #f_pdf = kde_sklearn(freq, f_arr, bandwidth=0.2)
         if i == 0:
-            ax.plot(f_arr, f_pdf, label='Initial', color = 'blue', linewidth=2, alpha=1)
+            ax.hist(freq, bins=20, histtype='step', label='Initial', color = 'blue', linewidth=2, alpha=1)
+            #ax.plot(f_arr, f_pdf, label='Initial', color = 'blue', linewidth=2, alpha=1)
         elif i == num_plots - 1:
-            ax.plot(f_arr, f_pdf, label='Final', color='red', linewidth=2, alpha=1)
-        else:
-            ax.plot(f_arr, f_pdf, label=f'loop {loop}', linewidth=3, alpha=0.5)
+            ax.hist(freq, bins=20, histtype='step', label='Final', color='red', linewidth=2, alpha=1)
+            #ax.plot(f_arr, f_pdf, label='Final', color='red', linewidth=2, alpha=1)
+        elif i%5 == 0:
+            ax.hist(freq, bins=20, histtype='step', label=f'loop {loop}', linewidth=3, alpha=0.5)
+            #ax.plot(f_arr, f_pdf, label=f'loop {loop}', linewidth=3, alpha=0.5)
         loop += 1
     ax.legend(loc='upper left')
 
@@ -227,11 +230,11 @@ def FMR_heatmap(type=0, field=0, display_FMR_heatmap=False):
 
 if __name__ == '__main__':
     folder = 'D:\ASI_MSci_Project\ASVI_Simulation_Output'
-    # vc = load_summary(folder, output='vortex_count')
-    # mc = load_summary(folder, output='macrospin_count')
+    vc = load_summary(folder, output='vortex_count')
+    mc = load_summary(folder, output='macrospin_count')
     # fd = load_summary(folder, output='fieldloops')
     FMR_f = load_summary(folder, output='FMR_frequency')
     # plot_applied_field(fd)
-    # plot_vortex_macrospin_number(vc, mc, 'sigmoid')
+    #plot_vortex_macrospin_number(vc, mc, 'exp')
     #FMR_heatmap(display_FMR_heatmap=True)
     plot_FMR(FMR_f)

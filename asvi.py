@@ -466,7 +466,6 @@ class ASVI:
             for root, dirs, files in os.walk(folder):
                 new_files = list(filter(lambda x: 'ASVIcounter' in x, files))
                 new_files.sort(key=sortFunc)
-                print(new_files)
                 for file in tqdm(new_files, desc='Animation Progress: ', unit='frame'):
                     ax.clear()
                     self.clearLattice()
@@ -474,7 +473,7 @@ class ASVI:
                     self.vertexCharge()
                     grid = copy.deepcopy(self.lattice)
                     # plotting vector field
-                    ax = plot_vector_field_2D(grid, ax)
+                    ax = plot_vector_field_2D(grid, fig, ax)
                     # setting title
                     H_applied = np.round(1000 * self.applied_field, 2)
                     H_theta = self.field_angle
