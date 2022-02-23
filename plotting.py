@@ -2,18 +2,19 @@ import numpy as np
 import os
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib import cm
 from matplotlib.colors import BoundaryNorm, ListedColormap, Normalize
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.optimize import curve_fit
 from scipy.stats import gaussian_kde
 from sklearn.neighbors import KernelDensity
 
-# Our customized Colormap
-clist = list('bkr')
-clist = ['#ff0000' if c == 'r' else c for c in clist]
-clist = ['#0000ff' if c == 'b' else c for c in clist]
-clist = ['#000000' if c == 'k' else c for c in clist]
-mycmap = ListedColormap(clist)
+# Customized colormap for nanobars
+clist1 = list('bkr')
+clist1 = ['#ff0000' if c == 'r' else c for c in clist1]
+clist1 = ['#0000ff' if c == 'b' else c for c in clist1]
+clist1 = ['#000000' if c == 'k' else c for c in clist1]
+mycmap = ListedColormap(clist1)
 mynorm = BoundaryNorm([-1, -0.5, 0.5, 1], mycmap.N)
 
 
@@ -120,7 +121,7 @@ def plot_vortex_macrospin_number(vortex_count, macrospin_count, fitfunc, ax=None
     ax.grid()
 
 
-def plot_vector_field_2D(lattice, fig, ax, color = None):
+def plot_vector_field_2D(asvi, fig, ax, color=None):
     """
     Return a vector field according to the input lattice
     Represented elements include:
@@ -132,24 +133,25 @@ def plot_vector_field_2D(lattice, fig, ax, color = None):
         - ax: the matplotlib axis to plot the vector field
     """
     # extracting useful values from lattice
-    X = lattice[:, :, 0].flatten()
-    Y = lattice[:, :, 1].flatten()
-    bar_l = lattice[:, :, 7].flatten()
-    bar_w = lattice[:, :, 8].flatten()
-    Mx = lattice[:, :, 3].flatten()
-    My = lattice[:, :, 4].flatten()
+    pos = asvi.pos_matrix()
+    mag = asvi.mag_matrix()
+    vc = asvi.vc_matrix()
+    X = pos[:, :, 0].flatten()
+    Y = pos[:, :, 1].flatten()
+    Mx = mag[:, :, 0].flatten()
+    My = mag[:, :, 1].flatten()
+    Cv = vc.flatten()
+    bar_l = asvi.get_attribute_matrix('bar_l').flatten()
+    bar_w = asvi.get_attribute_matrix('bar_w').flatten()
+    bar_w[np.isnan(bar_w)] = 0
     U = Mx * bar_l  # normalise vector
     V = My * bar_l  # normalise vector
-    Cv = lattice[:, :, 10].flatten()
     # sorting out colors and thicknesses
     line_w = 4 * (bar_w > 150e-9) + 1
     if color is None:
         line_rbg = np.arctan(Mx + My)
         color = mycmap(mynorm(line_rbg))
-    else:
-        cmap = plt.get_cmap('plasma')
-        norm = Normalize(vmin=2, vmax=11)
-        color = cmap(norm(color))
+    # plotting vector field
     ax.quiver(X, Y, U, V, angles='xy', scale_units='xy', scale=1, pivot='mid', zorder=1,
               linewidths=line_w, color=color, edgecolors=color)
     ax.scatter(X, Y, s=50, c=Cv, cmap='gist_rainbow', marker='o', zorder=2, vmax=1, vmin=-1)
@@ -157,18 +159,13 @@ def plot_vector_field_2D(lattice, fig, ax, color = None):
     ax.set_ylabel('Ly (m)')
     ax.ticklabel_format(style='sci', scilimits=(0, 0))
     ax.use_sticky_edges = False
-    # make a color bar for FMR
-    # divider = make_axes_locatable(ax)
-    # cax = divider.append_axes("right", size="5%", pad=0.05)
-    # fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), cax=cax, orientation='vertical',
-    #              label='FMR frequency (GHz)')
     return ax
 
 
-def plot_FMR(FMR_frequency, fig=None, ax=None):
+def plot_FMR(FMR_frequency):
 
-    if fig is None or ax is None:
-        fig, ax = plt.subplots()
+    fig, axes = plt.subplots(1, 2, constrained_layout=True)
+    ax1, ax2 = axes[0], axes[1]
 
     def kde_sklearn(x, x_grid, bandwidth=0.2, **kwargs):
         """Kernel Density Estimation with Scikit-learn"""
@@ -179,31 +176,34 @@ def plot_FMR(FMR_frequency, fig=None, ax=None):
         return np.exp(log_pdf)
     # Setting color code
     num_plots = len(FMR_frequency)
-    #colormap = plt.cm.gist_ncar
-    #plt.gca().set_prop_cycle(plt.cycler('color', plt.cm.jet(np.linspace(0, 1, num_plots))))
     offset = 2
     f_max = np.max(FMR_frequency) + offset
     f_min = np.min(FMR_frequency) - offset
     f_arr = np.arange(f_min, f_max, 0.01)
     # Plotting
-    ax.set_title('FMR Spectrum')
-    ax.set_xlabel('Frequency (Hz)')
-    ax.set_ylabel('Occurrence (a.u.)')
+    fig.suptitle('FMR Spectrum')
+    ax1.set_xlabel('Frequency (GHz)')
+    ax1.set_ylabel('Occurrence')
+    ax1.set_xlim(f_min, f_max)
+    ax2.set_xlabel('Frequency (GHz)')
+    ax2.set_ylabel('Probability')
+
     loop = 0
     for i in range(0, num_plots):
         freq = FMR_frequency[i]
-        #f_pdf = kde_sklearn(freq, f_arr, bandwidth=0.2)
+        f_pdf = kde_sklearn(freq, f_arr, bandwidth=0.2)
         if i == 0:
-            ax.hist(freq, bins=20, histtype='step', label='Initial', color = 'blue', linewidth=2, alpha=1)
-            #ax.plot(f_arr, f_pdf, label='Initial', color = 'blue', linewidth=2, alpha=1)
+            ax1.hist(freq, bins=10, histtype='step', label='Initial', color = 'blue', linewidth=2, alpha=1)
+            ax2.plot(f_arr, f_pdf, label='Initial', color = 'blue', linewidth=2, alpha=1)
         elif i == num_plots - 1:
-            ax.hist(freq, bins=20, histtype='step', label='Final', color='red', linewidth=2, alpha=1)
-            #ax.plot(f_arr, f_pdf, label='Final', color='red', linewidth=2, alpha=1)
-        elif i%5 == 0:
-            ax.hist(freq, bins=20, histtype='step', label=f'loop {loop}', linewidth=3, alpha=0.5)
-            #ax.plot(f_arr, f_pdf, label=f'loop {loop}', linewidth=3, alpha=0.5)
+            ax1.hist(freq, bins=10, histtype='step', label='Final', color='red', linewidth=2, alpha=1)
+            ax2.plot(f_arr, f_pdf, label='Final', color='red', linewidth=2, alpha=1)
+        elif i % 5 == 0:
+            ax1.hist(freq, bins=10, histtype='step', label=f'loop {loop}', linewidth=3, alpha=0.5)
+            ax2.plot(f_arr, f_pdf, label=f'loop {loop}', linewidth=3, alpha=0.5)
         loop += 1
-    ax.legend(loc='upper left')
+    ax1.legend(loc='upper left')
+    ax2.legend(loc='upper left')
 
 
 def FMR_heatmap(type=0, field=0, display_FMR_heatmap=False):
@@ -229,7 +229,7 @@ def FMR_heatmap(type=0, field=0, display_FMR_heatmap=False):
 
 
 if __name__ == '__main__':
-    folder = 'D:\ASI_MSci_Project\ASVI_Simulation_Output'
+    folder = 'E:\ASI_MSci_Project\ASVI_Simulation_Output'
     vc = load_summary(folder, output='vortex_count')
     mc = load_summary(folder, output='macrospin_count')
     # fd = load_summary(folder, output='fieldloops')

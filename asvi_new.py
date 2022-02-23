@@ -9,7 +9,7 @@ from tqdm import tqdm
 from plotting import plot_vector_field_2D, FMR_heatmap
 from asvi_materials import NanoBar, Vertex
 
-plt.rcParams['animation.ffmpeg_path'] = r'D:\ASI_MSci_Project\ffmpeg\bin\ffmpeg.exe'
+plt.rcParams['animation.ffmpeg_path'] = r'E:\ASI_MSci_Project\ffmpeg\bin\ffmpeg.exe'
 
 
 class ASVI:
@@ -39,7 +39,7 @@ class ASVI:
     '''
 
     # INITIALISATION
-    def __init__(self, unit_cells_x=25, unit_cells_y=25, vertex_gap=1e-7,
+    def __init__(self, unit_cells_x=25, unit_cells_y=25, vertex_gap=100e-9,
                  interType='dumbbell', periodicBC=False):
         # Lattice Parameters
         self.unit_cells_x = unit_cells_x
@@ -70,18 +70,37 @@ class ASVI:
         '''
         self.lattice = None
 
-    def get_hc_matrix(self):
-        grid = self.lattice
-        hc_matrix = []
-        for x in range(0, self.side_len_x):
-            hc_matrix.append([])
-            for y in range(0, self.side_len_y):
-                obj = grid[x, y]
-                hc_matrix[x].append(obj.hc)
-        return np.asarray(hc_matrix, dtype=float)
+    def get_attribute_matrix(self, attr, grid=None):
 
+        assert type(attr) == str
+        if grid is None:
+            grid = self.lattice
+        len_x = grid.shape[0]
+        len_y = grid.shape[1]
+
+        attr_matrix = []
+        for x in range(0, len_x):
+            attr_matrix.append([])
+            for y in range(0, len_y):
+                obj = grid[x, y]
+                if hasattr(obj, attr):
+                    attr_matrix[x].append(getattr(obj, attr))
+                else:
+                    attr_matrix[x].append(None)
+        return np.asarray(attr_matrix, dtype=float)
+
+    def pos_matrix(self, grid=None):
+        return self.get_attribute_matrix('pos', grid)
+
+    def mag_matrix(self, grid=None):
+        return self.get_attribute_matrix('mag', grid)
+
+    def hc_matrix(self, grid=None):
+        return self.get_attribute_matrix('hc', grid)
+
+    def vc_matrix(self, grid=None):
+        return self.get_attribute_matrix('v_c', grid)
     # SAVE & LOAD FUNCTIONS
-    # TODO: modify save & load methods
     def save(self, file, folder=os.getcwd()):
         '''
         Save existing arrays
@@ -92,7 +111,8 @@ class ASVI:
             if not os.path.exists(folder):
                 os.makedirs(folder)
         file = file.replace('.', 'p')
-        parameters = np.array([self.unit_cells_x, self.unit_cells_y, self.vertex_gap])
+        parameters = np.array([self.unit_cells_x, self.unit_cells_y, self.vertex_gap,
+                               self.side_len_x, self.side_len_y, self.applied_field, self.field_angle])
         np.savez_compressed(os.path.join(folder, file), self.lattice, parameters)
 
     def load(self, file):
@@ -101,28 +121,20 @@ class ASVI:
         '''
         if '.npz' not in file:
             file = file + '.npz'
-        npzfile = np.load(file)
+        npzfile = np.load(file, allow_pickle=True)
         parameters = npzfile['arr_1']
         self.unit_cells_x = np.int(parameters[0])
         self.unit_cells_y = np.int(parameters[1])
         self.vertex_gap = np.float(parameters[2])
-        self.bar_length = np.float(parameters[3])
-        self.bar_width = np.float(parameters[4])
-        self.bar_thickness = np.float(parameters[5])
-        self.magnetisation = np.float(parameters[6])
-        self.side_len_x = np.int(parameters[7])
-        self.side_len_y = np.int(parameters[8])
-        self.type = parameters[9]
-        self.applied_field = np.float(parameters[10])
-        self.field_angle = np.float(parameters[11])
-        # print(self.type)
-        if len(parameters) > 12:
-            self.Hc = np.float(parameters[12])
-            self.Hc_std = np.float(parameters[13])
+        self.side_len_x = np.int(parameters[3])
+        self.side_len_y = np.int(parameters[4])
+        self.applied_field = np.float(parameters[5])
+        self.field_angle = np.float(parameters[6])
         self.lattice = npzfile['arr_0']
 
     # LATTICE TYPES
-    def square(self, Hc_mean=0.03, Hc_std=0.05, bar_l=600e-9, bar_w=150e-9, bar_t=20e-9):
+    def square(self, hc_m=0.03, hc_v=0.02, hc_std=0.05, magnetisation=800e3,
+               bar_l=600e-9, bar_w=125e-9, bar_t=20e-9):
         '''
         Defines the lattice positions, magnetisation directions and coercive fields of an array of
         square ASI
@@ -133,7 +145,7 @@ class ASVI:
         self.type = 'square'
         self.side_len_x = 2 * self.unit_cells_x + 1
         self.side_len_y = 2 * self.unit_cells_y + 1
-        self.unit_cell_len = (bar_l + self.vertex_gap)/2
+        self.unit_cell_len = (bar_l + self.vertex_gap) / 2
         grid = []
         for x in range(0, self.side_len_x):
             grid.append([])
@@ -141,17 +153,39 @@ class ASVI:
                 xpos = x * self.unit_cell_len
                 ypos = y * self.unit_cell_len
                 if (x + y) % 2 != 0:
-                    Hc = np.random.normal(loc=Hc_mean, scale=Hc_std * Hc_mean, size=None)
                     if y % 2 == 0:
-                        grid[x].append(NanoBar(xpos, ypos, 0., 1., 0., 0., Hc, bar_l, bar_w, bar_t))
+                        grid[x].append(NanoBar(xpos, ypos, 0., 1., 0., 0., hc_m, hc_v, hc_std,
+                                               bar_l, bar_w, bar_t, magnetisation, 'macrospin'))
                     else:
-                        grid[x].append(NanoBar(xpos, ypos, 0., 0., 1., 0., Hc, bar_l, bar_w, bar_t))
+                        grid[x].append(NanoBar(xpos, ypos, 0., 0., 1., 0., hc_m, hc_v, hc_std,
+                                               bar_l, bar_w, bar_t, magnetisation, 'macrospin'))
                 else:
                     if (x) % 2 == 0 and x != 0 and y != 0 and x != self.side_len_x - 1 and y != self.side_len_x - 1:
                         grid[x].append(Vertex(xpos, ypos, 0.))
                     else:
-                        grid[x].append(Vertex(xpos, ypos, 0.))
+                        grid[x].append(Vertex(xpos, ypos, None))
         self.lattice = np.asarray(grid, dtype=object)
+
+    def square_staircase(self, hc_thin=0.03, hc_thick=0.015, hc_v=0.02, hc_std=0.05, magnetisation=800e3,
+                         bar_l=600e-9, thin_bar_w=125e-9, thick_bar_w=200e-9, bar_t=20e-9):
+        self.square(hc_thin, hc_v, hc_std, magnetisation, bar_l, thin_bar_w, bar_t)
+        grid = copy.deepcopy(self.lattice)
+        for x in range(0, self.side_len_x):
+            for y in range(0, self.side_len_y):
+                obj = grid[x, y]
+                if x % 4 == 0 and y % 4 == 1:
+                    obj.bar_w = thick_bar_w
+                    obj.set_hc(hc_thick, hc_std)
+                elif x % 4 == 1 and y % 4 == 2:
+                    obj.bar_w = thick_bar_w
+                    obj.set_hc(hc_thick, hc_std)
+                elif x % 4 == 2 and y % 4 == 3:
+                    obj.bar_w = thick_bar_w
+                    obj.set_hc(hc_thick, hc_std)
+                elif x % 4 == 3 and y % 4 == 0:
+                    obj.bar_w = thick_bar_w
+                    obj.set_hc(hc_thick, hc_std)
+        self.lattice = grid
 
     # APPLIED FIELD TYPES
     def AdaptiveField(self, Hmax, steps):
@@ -160,7 +194,7 @@ class ASVI:
         Applied fields go from positive to negative
         (2 * steps) field values in a period
         '''
-        hc_min = np.nanmin(self.get_hc_matrix())
+        hc_min = np.nanmin(self.hc_matrix())
         field_steps = np.linspace(hc_min, Hmax, steps)
         field_steps = np.append(field_steps, np.negative(field_steps))
         return field_steps
@@ -178,14 +212,14 @@ class ASVI:
         Return a array of field steps linearly increasing field from Hmin to Hmax
         (steps) number of field values
         '''
-        hc_min = np.nanmin(self.get_hc_matrix())
-        field_steps = np.linspace(hc_min-0.006, Hmax, steps)
+        hc_min = np.nanmin(self.hc_matrix())
+        field_steps = np.linspace(hc_min - 0.006, Hmax, steps)
         field_steps = np.negative(field_steps)
         return field_steps
 
     # SIMULATION EXECUTABLES
     def fieldSweep(self, fieldType, Hmax, steps, Htheta, n=10, loops=1, folder=None,
-                   FMR = False, FMR_field = None):
+                   FMR=False, FMR_field=None):
         '''
         Sweeps through the lattice using the designated field type.
         Total number of steps for a full minor loop is (2 * step).
@@ -220,7 +254,7 @@ class ASVI:
             frequency.append(freq)
         self.relax(n=n)
         self.save('InitialASVI_Hmax{:.3f}_steps{}_Angle{:.0f}_n{}_Loops{}'.format(
-                   Hmax, steps, Htheta, n, loops), folder=folder)
+            Hmax, steps, Htheta, n, loops), folder=folder)
         while i <= loops:
             self.previous = copy.deepcopy(self)
             for field in tqdm(field_steps, desc='Simulation Loop {} Progress: '.format(i),
@@ -229,22 +263,22 @@ class ASVI:
                 Happlied = field * np.array([np.cos(Hrad), np.sin(Hrad), 0.])
                 self.relax(Happlied, n)
                 # saving statistical data
-                # q.append(self.correlation(self.previous, self))
-                # mag.append(self.netMagnetisation())
-                # monopole.append(self.monopoleDensity())
-                # fieldloops.append(field)
-                # vortex_count.append(self.count_vortex())
-                # macrospin_count.append(self.count_macrospin())
+                q.append(self.correlation(self.previous, self))
+                mag.append(self.netMagnetisation())
+                monopole.append(self.monopoleDensity())
+                fieldloops.append(field)
+                vortex_count.append(self.count_vortex())
+                macrospin_count.append(self.count_macrospin())
                 self.save('ASVIcounter{}_Loop{}_FieldApplied{:.3f}_Angle{:.0f}'.format(
                     counter, i, field, Htheta), folder=folder)
                 counter += 1
             if FMR:
-                #freq = self.FMR(FMR_field, Htheta, n)
+                # freq = self.FMR(FMR_field, Htheta, n)
                 freq = self.FMR_HM(n)
                 frequency.append(freq)
             i += 1
         self.save('FinalASVI_Hmax{:.3f}_steps{}_Angle{:.0f}_n{}_Loops{}'.format(
-                   Hmax, steps, Htheta, n, loops), folder=folder)
+            Hmax, steps, Htheta, n, loops), folder=folder)
         # Saving statistical information
         file = 'ASVIStateInfo_Hmax{:.3f}_steps{}_Angle{:.0f}_n{}_Loops{}'.format(Hmax, steps, Htheta, n, loops)
         parameters = np.array([Hmax, steps, Htheta, n, loops])
@@ -256,65 +290,27 @@ class ASVI:
 
     def FMR_HM(self, n=5):
         grid = copy.deepcopy(self.lattice)
-        Xpos, Ypos = np.where(grid[:, :, 6] != 0)
+        Xpos, Ypos = np.nonzero(grid)
         positions = np.array(list(zip(Xpos, Ypos)))
 
         freq = []
         for pos in positions:
             x = pos[0]
             y = pos[1]
-            if grid[x, y, 11] == True:
-                type = 2
-            elif self.get_bar_width(x, y) > 150e-9:
-                type = 1
-            else:
-                type = 0
-            B = 1000 * np.linalg.norm(self.Hlocal(x, y, n=n))   # convert to mT
-            frequency = FMR_heatmap(type = type, field = B)
-            freq.append(frequency)
+            obj = grid[x, y]
+            if type(obj) == NanoBar:
+                if obj.type == 'Vortex':
+                    tp = 2
+                elif obj.bar_w > 150e-9:
+                    tp = 1
+                else:
+                    tp = 0
+                B = 1000 * np.linalg.norm(self.Hlocal(x, y, n=n))  # convert to mT
+                frequency = FMR_heatmap(type=tp, field=B)
+                freq.append(frequency)
         return np.array(freq)
 
-    def FMRAnimation(self, folder, fps=10):
-        """
-        Produce an animation of the lattice with frequency of each bar as it goes through the field loop
-        just provide the folder where the field sweeps are saved
-        """
-        print('STARTING TO MAKE ANIMATION...')
-        FFMpegWriter = manimation.writers['ffmpeg']
-        metadata = dict(title='ASVI FMR Simulation', artist='Matplotlib',
-                        comment='Artificial Spin Vortex Ice Simulation')
-        writer = FFMpegWriter(fps=fps, metadata=metadata)
-        fig, ax = plt.subplots(figsize=(8, 8), constrained_layout=True)
-
-        def sortFunc(element):
-            begin = element.find('counter') + 7
-            end = element.find('_Loop')
-            return (int(element[begin:end]))
-
-        with writer.saving(fig, (os.path.join(folder, "animation.mp4")), 100):
-            for root, dirs, files in os.walk(folder):
-                new_files = list(filter(lambda x: 'ASVIcounter' in x, files))
-                new_files.sort(key=sortFunc)
-                for file in tqdm(new_files, desc='Animation Progress: ', unit='frame'):
-                    ax.clear()
-                    self.clearLattice()
-                    self.load(os.path.join(root, file))
-                    self.vertexCharge()
-                    freq = self.FMR_HM()
-                    grid = copy.deepcopy(self.lattice)
-                    # plotting vector field
-                    ax = plot_vector_field_2D(grid, fig, ax, color = freq)
-                    # setting title
-                    H_applied = np.round(1000 * self.applied_field, 2)
-                    H_theta = self.field_angle
-                    steps = file[file.find('counter') + 7:file.find(r'_Loop')]
-                    ax.set_title("Steps: " + steps, loc='left', pad=20)
-                    ax.set_title('Applied Field: {} mT, Field Angle = {} deg'.format(H_applied, H_theta),
-                                 loc='right', pad=20)
-                    writer.grab_frame()
-        print('ANIMATION COMPLETE!')
-
-    def fieldSweepAnimation(self, folder, fps = 10):
+    def fieldSweepAnimation(self, folder, figsize=(8, 8), fps=10):
         '''
         Will produce an animation of the lattice as it goes through the field sweep
         just provide the folder where the field sweeps are saved
@@ -323,8 +319,8 @@ class ASVI:
         FFMpegWriter = manimation.writers['ffmpeg']
         metadata = dict(title='ASVI Simulation', artist='Matplotlib',
                         comment='Artificial Spin Vortex Ice Simulation')
-        writer = FFMpegWriter(fps = fps, metadata = metadata)
-        fig, ax = plt.subplots(figsize=(8, 8), constrained_layout=True)
+        writer = FFMpegWriter(fps=fps, metadata=metadata)
+        fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
 
         def sortFunc(element):
             begin = element.find('counter') + 7
@@ -335,15 +331,13 @@ class ASVI:
             for root, dirs, files in os.walk(folder):
                 new_files = list(filter(lambda x: 'ASVIcounter' in x, files))
                 new_files.sort(key=sortFunc)
-                print(new_files)
                 for file in tqdm(new_files, desc='Animation Progress: ', unit='frame'):
                     ax.clear()
                     self.clearLattice()
                     self.load(os.path.join(root, file))
                     self.vertexCharge()
-                    grid = copy.deepcopy(self.lattice)
                     # plotting vector field
-                    ax = plot_vector_field_2D(grid, ax)
+                    ax = plot_vector_field_2D(self, fig, ax)
                     # setting title
                     H_applied = np.round(1000 * self.applied_field, 2)
                     H_theta = self.field_angle
@@ -463,8 +457,10 @@ class ASVI:
         same = 0
         for x in range(0, self.side_len_x):
             for y in range(0, self.side_len_y):
-                if l1[x, y, 6] != 0:
-                    if np.array_equal(l1[x, y, 3:6], l2[x, y, 3:6]) == True:
+                obj1 = l1[x, y]
+                obj2 = l2[x, y]
+                if obj1.hc != 0:
+                    if np.array_equal(obj1.mag, obj2.mag):
                         same += 1.0
                     total += 1.0
         return (same / total)
@@ -474,10 +470,16 @@ class ASVI:
         returns the magnetisation in the x and y directions
         '''
         grid = copy.deepcopy(self.lattice)
-        grid[grid[:, :, 6] == 0] = np.nan
-        mx = grid[:, :, 3].flatten()
-        my = grid[:, :, 4].flatten()
-        return (np.array([np.nanmean(mx), np.nanmean(my)]))
+        mx, my, mz = (np.array([], dtype=float) for i in range(3))
+        xpos, ypos = np.nonzero(grid)
+        positions = np.array(list(zip(xpos, ypos)))
+        for pos in positions:
+            obj = grid[pos[0], pos[1]]
+            if type(obj) == NanoBar:
+                mx = np.append(mx, obj.mag[0])
+                my = np.append(my, obj.mag[1])
+                mz = np.append(mz, obj.mag[2])
+        return np.array([np.nanmean(mx), np.nanmean(my), np.nanmean(mz)])
 
     def monopoleDensity(self):
         '''
@@ -488,7 +490,7 @@ class ASVI:
         #   The density is then calculated by dividing by the total area minus the edges
         self.vertexCharge()
         grid = self.lattice
-        magcharge = grid[:, :, 10].flatten()
+        magcharge = self.vc_matrix(grid).flatten()
         return (np.nanmean(np.absolute(magcharge)))
 
     def Hlocal(self, x, y, n=1):
@@ -610,9 +612,10 @@ class ASVI:
         Should work on tetris and shakti but haven't test it yet
         '''
         grid = copy.deepcopy(self.lattice)
-        for x in np.arange(0, self.side_len_x):
-            for y in np.arange(0, self.side_len_y):
-                if np.isnan(grid[x, y, 10]) != True:
+        for x in range(0, self.side_len_x):
+            for y in range(0, self.side_len_y):
+                obj = grid[x, y]
+                if type(obj) == Vertex:
                     x1 = x - 1
                     x2 = x + 2
                     y1 = y - 1
@@ -627,91 +630,13 @@ class ASVI:
                     if y2 > self.side_len_y:
                         y2 = self.side_len_y
                     local = grid[x1:x2, y1:y2]
-                    charge = -(np.sum(local[0:2, 0:2, 3:6]) - np.sum(local[1:3, 1:3, 3:6])) / np.count_nonzero(
-                        local[:, :, 6])
+                    mag_matrix = self.mag_matrix(local)
+                    net_charge = -(np.sum(mag_matrix[0:2, 0:2]) - np.sum(mag_matrix[1:3, 1:3]))
+                    macro_count = self.count_macrospin(local)
+                    charge = net_charge / macro_count
 
-                    if self.type == 'kagome':
-                        if x == 0:
-                            charge = np.sum(local[0, :, 3]) - np.sum(local[1, :, 3]) + np.sum(local[:, 0, 4]) - np.sum(
-                                local[:, 2, 4])
-                        elif x == self.side_len_x - 1:
-                            charge = np.sum(local[:, :, 3]) - np.sum(local[:, :, 3]) + np.sum(local[:, 0, 4]) - np.sum(
-                                local[:, 2, 4])
-                        elif (x - 2) % 4:
-                            if (y - 2) % 4:
-                                charge = np.sum(local[0, :, 3]) - np.sum(local[1, :, 3]) + np.sum(
-                                    local[:, 0, 4]) - np.sum(local[:, 2, 4])
-                            else:
-                                charge = np.sum(local[1, :, 3]) - np.sum(local[2, :, 3]) + np.sum(
-                                    local[:, 0, 4]) - np.sum(local[:, 2, 4])
-                        elif (x) % 4:
-                            if (y - 2) % 4:
-                                charge = np.sum(local[1, :, 3]) - np.sum(local[2, :, 3]) + np.sum(
-                                    local[:, 0, 4]) - np.sum(local[:, 2, 4])
-                            else:
-                                charge = np.sum(local[0, :, 3]) - np.sum(local[1, :, 3]) + np.sum(
-                                    local[:, 0, 4]) - np.sum(local[:, 2, 4])
-                        if charge > 3:
-                            charge = 1
-                        elif charge < -3:
-                            charge = -1
-                        else:
-                            charge = 0
-
-                    grid[x, y, 10] = charge
+                    obj.v_c = charge
 
         self.lattice = grid
 
-    def determinePeriod(self, folder, Hmax='1p414214e-01_Angle'):
-        '''
-        Determines the period in the minor loop.
-        '''
-        print(Hmax)
-        print(type(Hmax))
-        filenames_pos = []
-        filenames_neg = []
-        latticelist_pos = []
-        latticelist_neg = []
-        for root, sub, files in os.walk(folder):
-            for file in files:
-                checkstr = 'd' + Hmax
-                print(str(checkstr), file, str(checkstr) in file, file.find(checkstr))
-                if checkstr in file:
-                    print('pos')
-                    filename = os.path.join(root, file)
-                    filenames_pos.append(filename)
-        # filenames_pos.sort(key = self.sortFunc2)
-        filenames_pos.sort(key=lambda s: os.path.getmtime(s))
-        # print(filenames_pos)
-        for root, sub, files in os.walk(folder):
-            for file in files:
-                checkstr = '-' + Hmax
-                print(checkstr, file, checkstr in file)
-                if checkstr in file:
-                    print('neg')
-                    filename = os.path.join(root, file)
-                    filenames_neg.append(filename)
-        # filenames_neg.sort(key = self.sortFunc2)
-        filenames_neg.sort(key=lambda s: os.path.getmtime(s))
-        print(filenames_pos, filenames_neg)
-        for i, file_pos, file_neg in zip(np.arange(0, len(filenames_neg)), reversed(filenames_pos),
-                                         reversed(filenames_neg)):
-            if i == 0:
-                self.load(file_pos)
-                latticelist_pos.append(self.returnLattice())
-                self.load(file_neg)
-                latticelist_neg.append(self.returnLattice())
-                continue
-            self.load(file_pos)
-            latticelist_pos.append(self.returnLattice())
-            self.load(file_neg)
-            latticelist_neg.append(self.returnLattice())
-            # self.graphCharge()
-            # print(i, len(latticelist_neg))
-            corr_pos = np.array_equal(latticelist_pos[0][:, :, 3:6], latticelist_pos[i][:, :, 3:6])
-            corr_neg = np.array_equal(latticelist_neg[0][:, :, 3:6], latticelist_neg[i][:, :, 3:6])
-            print(corr_pos, corr_neg, i)
-            if corr_pos == True and corr_neg == True:
-                return (i)
-                break
-        self.load(filenames_neg[-1])
+
