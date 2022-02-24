@@ -48,16 +48,16 @@ class NanoBar:
             assert len(mag) == 3, "Input magnetic array should have 3 indices"
             self.set_mag(xmag=mag[0], ymag=mag[1], zmag=mag[2])
 
-    def set_hc(self, hc_u, hc_std, bias=0):
-        hc = hc_u + bias
+    def set_hc(self, hc_u, hc_std, bias=False):
+        if bias:
+            hc = hc_u * (1 + self.hc_bias)
+        else:
+            hc = hc_u
         hc_new = np.random.normal(loc=hc, scale=hc*hc_std, size=None)
+        # update class properties
         self.hc = hc_new
         self.hc_m = hc_u
         self.hc_std = hc_std
-        if bias != 0:
-            self.hc_bias = bias
-        else:
-            self.hc_bias = (self.hc - self.hc_m) / self.hc_m
 
     # CLASS METHODS
     def flip(self):

@@ -299,7 +299,7 @@ class ASVI:
             y = pos[1]
             obj = grid[x, y]
             if type(obj) == NanoBar:
-                if obj.type == 'Vortex':
+                if obj.type == 'vortex':
                     tp = 2
                 elif obj.bar_w > 150e-9:
                     tp = 1
@@ -382,6 +382,7 @@ class ASVI:
                     field = np.dot(np.array(Happlied + self.Hlocal(x, y, n=n)), unit_vector)
                     if field < -obj.hc:
                         obj.set_macrospin()
+                        obj.flip()
 
             if flipcount > 0:
                 unrelaxed = True
@@ -562,7 +563,7 @@ class ASVI:
                     obji = grid[xi, yi]
                     pos = obji.pos
                     mag = obji.mag
-                    if np.linalg.norm(pos - r0) / (n + 1) <= 1.0 and np.array_equal(pos, r0) != True:
+                    if np.linalg.norm(pos - r0) / (n + 1) <= 1.0 and not np.array_equal(pos, r0):
                         field = self.fieldCalc(x, y, mag, r0, pos)
                         Hl.append(field)
             return sum(Hl)
@@ -633,7 +634,10 @@ class ASVI:
                     mag_matrix = self.mag_matrix(local)
                     net_charge = -(np.sum(mag_matrix[0:2, 0:2]) - np.sum(mag_matrix[1:3, 1:3]))
                     macro_count = self.count_macrospin(local)
-                    charge = net_charge / macro_count
+                    if macro_count == 0:
+                        charge = 0
+                    else:
+                        charge = net_charge / macro_count
 
                     obj.v_c = charge
 

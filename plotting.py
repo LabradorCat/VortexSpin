@@ -227,7 +227,7 @@ def FMR_heatmap(type=0, field=0, bias=0, display_FMR_heatmap=False):
             freq = -0.035 * field + 6.9
         if type == 2:  # vortex
             freq = -1.86 * np.tanh(0.2 * field) + 4.5
-        return np.random.normal(loc=freq*(1+bias), scale=0.1, size=None)
+        return np.random.normal(loc=freq*(1+bias), scale=0.1*(1-bias), size=None)
 
 
 if __name__ == '__main__':
