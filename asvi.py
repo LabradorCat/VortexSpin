@@ -188,7 +188,7 @@ class ASVI:
         return a array of field sweep values from 0 to Hmax in the form of a sine wave
         (2 * steps) field values in a period
         '''
-        field_steps = Hmax * np.sin(np.linspace(0, 2 * np.pi, 2 * (steps)))
+        field_steps = Hmax * np.sin(np.linspace(0, 2 * np.pi, 2 * steps))
         return field_steps
 
     def LinearField(self, Hmax, steps):
@@ -199,6 +199,17 @@ class ASVI:
         hc_min = np.nanmin(self.hc_matrix())
         field_steps = np.linspace(hc_min - 0.006, Hmax, steps)
         field_steps = np.negative(field_steps)
+        return field_steps
+
+    def SinFieldTrain(self, Hmax, steps):
+        hc_min = np.nanmin(self.hc_matrix())
+        amp = (Hmax - hc_min) / 2
+        offset = Hmax - amp
+        steps = np.linspace(0, 2 * np.pi, 2 * steps, endpoint=False)
+        field_steps = np.array([])
+        for i in steps:
+            field = amp * np.sin(i) + offset
+            field_steps = np.append(field_steps, [field, -field])
         return field_steps
 
     # SIMULATION EXECUTABLES
@@ -216,6 +227,7 @@ class ASVI:
         # Determine which field type to sweep the lattice
         field_steps = {
             'Sine': self.SineField(Hmax, steps),
+            'Sine_train': self.SinFieldTrain(Hmax, steps),
             'Adaptive': self.AdaptiveField(Hmax, steps),
             'Linear': self.LinearField(Hmax, steps)
         }.get(fieldType, Exception('Field sweep type not defined'))
@@ -226,7 +238,6 @@ class ASVI:
             angleFactor = np.cos(Hrad)
         else:
             angleFactor = np.sin(Hrad)
-        field_steps = field_steps / angleFactor
         # Create statistical parameters
         q, mag, monopole, fieldloops, frequency, vortex_count, macrospin_count = ([] for i in range(7))
         counter = 0
@@ -243,8 +254,9 @@ class ASVI:
             self.previous = copy.deepcopy(self)
             for field in tqdm(field_steps, desc='Simulation Loop {} Progress: '.format(i),
                               unit='step'):
-                self.applied_field = field
-                Happlied = field * np.array([np.cos(Hrad), np.sin(Hrad), 0.])
+                f_exp = field / angleFactor
+                self.applied_field = f_exp
+                Happlied = f_exp * np.array([np.cos(Hrad), np.sin(Hrad), 0.])
                 self.relax(Happlied, n)
                 # saving statistical data
                 q.append(self.correlation(self.previous, self))
@@ -257,7 +269,6 @@ class ASVI:
                     counter, i, field, Htheta), folder=folder)
                 counter += 1
             if FMR:
-                # freq = self.FMR(FMR_field, Htheta, n)
                 freq = self.FMR_HM(n)
                 frequency.append(freq)
             i += 1

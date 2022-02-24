@@ -234,9 +234,9 @@ if __name__ == '__main__':
     folder = 'E:\ASI_MSci_Project\ASVI_Simulation_Output'
     vc = load_summary(folder, output='vortex_count')
     mc = load_summary(folder, output='macrospin_count')
-    # fd = load_summary(folder, output='fieldloops')
+    fd = load_summary(folder, output='fieldloops')
     FMR_f = load_summary(folder, output='FMR_frequency')
-    # plot_applied_field(fd)
+    plot_applied_field(fd)
     #plot_vortex_macrospin_number(vc, mc, 'exp')
     #FMR_heatmap(display_FMR_heatmap=True)
     plot_FMR(FMR_f)

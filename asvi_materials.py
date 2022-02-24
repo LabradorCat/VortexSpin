@@ -7,20 +7,19 @@ class NanoBar:
                  bar_l=600e-9, bar_w=150e-9, bar_t=20e-9,
                  magnetisation=800e3, type='macrospin'):
         assert type in ('macrospin', 'vortex')
-        # Position
-        self.pos = np.array([xpos, ypos, zpos], dtype=float)
-        # Magnetic Properties
         self.type = type
+        self.pos = np.array([xpos, ypos, zpos], dtype=float)
         self.mag = np.array([xmag, ymag, zmag], dtype=float)
         self.unit_vector = self.mag / np.linalg.norm(self.mag)
         self.magnetisation = magnetisation
+        # Coercive field
         self.hc_m = hc_m        # macrospin mean coersive field
         self.hc_v = hc_v        # vortex mean coersive field
         self.hc_std = hc_std    # percentage standard deviation
         self.hc = np.random.normal(loc=hc_m, scale=hc_std * hc_m, size=None)
-        self.hc_bias = (self.hc - self.hc_m) / self.hc_m
         if self.type == 'vortex':
             self.set_hc(hc_v, hc_std)
+        self.hc_bias = (self.hc - self.hc_m) / self.hc_m
         # Material Properties
         self.bar_l = bar_l
         self.bar_w = bar_w

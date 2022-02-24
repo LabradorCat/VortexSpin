@@ -21,9 +21,9 @@ field_max = 0.023  # Maximum field to by applied at field angle measured in Tels
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Simulation Parameters
-Field = 'Adaptive'      # Type of Field used to sweep the lattice
+Field = 'Sine_train'      # Type of Field used to sweep the lattice
 InterType = 'dumbbell'  # Type of interaction (dumbbell or dipole)
-PeriodicBC = True       # Apply periodic boundary condition
+PeriodicBC = False     # Apply periodic boundary condition
 Hsteps = 20             # Number of steps between the minimum value of the coercive field
                         # and the maxium field specified above. Total number of steps in a
                         # minor loop is = (2*steps)
