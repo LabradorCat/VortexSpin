@@ -1,6 +1,6 @@
 import shutil
 import os
-from asvi_new import ASVI
+from asvi import ASVI
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Material & Lattice Parameters
