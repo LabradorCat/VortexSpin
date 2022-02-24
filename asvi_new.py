@@ -306,7 +306,7 @@ class ASVI:
                 else:
                     tp = 0
                 B = 1000 * np.linalg.norm(self.Hlocal(x, y, n=n))  # convert to mT
-                frequency = FMR_heatmap(type=tp, field=B)
+                frequency = FMR_heatmap(type=tp, field=B, bias=obj.hc_bias)
                 freq.append(frequency)
         return np.array(freq)
 

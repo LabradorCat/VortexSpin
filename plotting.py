@@ -206,9 +206,9 @@ def plot_FMR(FMR_frequency):
     ax2.legend(loc='upper left')
 
 
-def FMR_heatmap(type=0, field=0, display_FMR_heatmap=False):
+def FMR_heatmap(type=0, field=0, bias=0, display_FMR_heatmap=False):
     if display_FMR_heatmap:
-        uH = np.linspace(-10, 10, 100)
+        uH = np.linspace(-10, 10, 1000)
         plt.figure('FMR_heatmap', figsize=(3,3))
         plt.xlabel('uH(mT)')
         plt.xlim(-10, 10)
@@ -220,12 +220,14 @@ def FMR_heatmap(type=0, field=0, display_FMR_heatmap=False):
         plt.grid()
         plt.show()
     else:
+        freq = 0
         if type == 0:  # thin bar
-            return -0.035 * field + 8.7
+            freq = -0.035 * field + 8.7
         if type == 1:  # thick bar
-            return -0.035 * field + 6.9
+            freq = -0.035 * field + 6.9
         if type == 2:  # vortex
-            return -1.86 * np.tanh(0.2 * field) + 4.5
+            freq = -1.86 * np.tanh(0.2 * field) + 4.5
+        return np.random.normal(loc=freq*(1+bias), scale=0.1, size=None)
 
 
 if __name__ == '__main__':

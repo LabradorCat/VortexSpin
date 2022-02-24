@@ -18,7 +18,7 @@ class NanoBar:
         self.hc_v = hc_v        # vortex mean coersive field
         self.hc_std = hc_std    # percentage standard deviation
         self.hc = np.random.normal(loc=hc_m, scale=hc_std * hc_m, size=None)
-        self.hc_bias = (self.hc - self.hc_m) / self.hc_std
+        self.hc_bias = (self.hc - self.hc_m) / self.hc_m
         if self.type == 'vortex':
             self.set_hc(hc_v, hc_std)
         # Material Properties
@@ -52,6 +52,12 @@ class NanoBar:
         hc = hc_u + bias
         hc_new = np.random.normal(loc=hc, scale=hc*hc_std, size=None)
         self.hc = hc_new
+        self.hc_m = hc_u
+        self.hc_std = hc_std
+        if bias != 0:
+            self.hc_bias = bias
+        else:
+            self.hc_bias = (self.hc - self.hc_m) / self.hc_m
 
     # CLASS METHODS
     def flip(self):
