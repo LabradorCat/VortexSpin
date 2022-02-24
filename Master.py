@@ -5,7 +5,7 @@ from asvi import ASVI
 #-----------------------------------------------------------------------------------------------------------------------
 # Material & Lattice Parameters
 # Define the size of the lattice and material properties
-size = 20  ## Dimension of array
+size = 5  ## Dimension of array
 Hc_thin = 0.029  # Coercive Field (T)
 Hc_thick = 0.01625
 Hc_Vortex = 0.026
@@ -17,7 +17,7 @@ thin_bar_width = 125e-9  # Bar width in m
 thick_bar_width = 200e-9
 magnetisation = 800e3  # Saturation magnetisation of material in A/m (permalloy is 80e3)
 field_angle = 45.  # Angle at which the field will be applied in degrees
-field_max = 0.0235  # Maximum field to by applied at field angle measured in Telsa
+field_max = 0.023  # Maximum field to by applied at field angle measured in Telsa
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Simulation Parameters
@@ -31,7 +31,7 @@ loops = 10         # The number of minor field loops to be done
 #-----------------------------------------------------------------------------------------------------------------------
 # Running Simulation and output results
 output_folder_name = 'ASVI_Simulation_Output' # Simulation results export to 'output_folder_name' in the parent directory
-fps = 5    # Animation fps
+fps = 10    # Animation fps
 # Select what to perform in this run
 Simulate = True
 Animate = True
