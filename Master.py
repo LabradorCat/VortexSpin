@@ -9,7 +9,7 @@ size = 5  ## Dimension of array
 Hc_thin = 0.029  # Coercive Field (T)
 Hc_thick = 0.01625
 Hc_Vortex = 0.026
-Hc_std = 1.5  # Stanard deviation in the coercive field (as a percentage)
+Hc_std = 0.015  # Stanard deviation in the coercive field (as a percentage)
 vertex_gap = 100e-9  # Vertex gap in m
 bar_length = 600e-9  # Bar length in m
 bar_thickness = 20e-9  # Bar thickness in m
@@ -21,12 +21,14 @@ field_max = 0.023  # Maximum field to by applied at field angle measured in Tels
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Simulation Parameters
-Field = 'Adaptive'  # Type of Field used to sweep the lattice
-Hsteps = 20         # Number of steps between the minimum value of the coercive field
-                    # and the maxium field specified above. Total number of steps in a
-                    # minor loop is = (2*steps)
-neighbours = 2      # The radius of neighbouring spins that are included in the local field calculation
-loops = 10         # The number of minor field loops to be done
+Field = 'Adaptive'      # Type of Field used to sweep the lattice
+InterType = 'dumbbell'  # Type of interaction (dumbbell or dipole)
+PeriodicBC = True       # Apply periodic boundary condition
+Hsteps = 20             # Number of steps between the minimum value of the coercive field
+                        # and the maxium field specified above. Total number of steps in a
+                        # minor loop is = (2*steps)
+neighbours = 2          # The radius of neighbouring spins that are included in the local field calculation
+loops = 10              # The number of minor field loops to be done
 
 #-----------------------------------------------------------------------------------------------------------------------
 # Running Simulation and output results
@@ -39,17 +41,17 @@ Animate = True
 if __name__ == '__main__':
     folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir, output_folder_name))
     # Generate ASVI Class model
-    lattice = ASVI(size, size, vertex_gap=vertex_gap)
-    lattice.square_staircase(Hc_thin, Hc_thick, Hc_Vortex, Hc_std / 100, magnetisation,
+    lattice = ASVI(size, size, vertex_gap, InterType, PeriodicBC)
+    lattice.square_staircase(Hc_thin, Hc_thick, Hc_Vortex, Hc_std, magnetisation,
                              bar_length, thin_bar_width, thick_bar_width, bar_thickness)
 
-    if os.path.exists(folder) == False:
+    if not os.path.exists(folder):
         os.mkdir(folder)
 
     if Simulate:
         shutil.rmtree(folder)
         lattice.fieldSweep(fieldType=Field, Hmax=field_max, steps=Hsteps, Htheta=field_angle,
-                           n=neighbours, loops=loops, folder=folder, FMR=True, FMR_field=-0.0012)
+                           n=neighbours, loops=loops, folder=folder, FMR=True)
 
     if Animate:
         lattice.fieldSweepAnimation(folder, fps=fps)

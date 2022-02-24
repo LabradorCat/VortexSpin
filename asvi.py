@@ -15,33 +15,16 @@ plt.rcParams['animation.ffmpeg_path'] = r'E:\ASI_MSci_Project\ffmpeg\bin\ffmpeg.
 class ASVI:
     '''
     Artificial Spin Vortex Ice model to be performing field sweeps
-
-        Supported lattice types:
-           - Square
-           - Staircase Thin-Thick square
-
-       The lattice is stored as a numpy array obeying the following index table
-            INDEX       PROPERTIES
-            0           x_pos
-            1           y_pos
-            2           z_pos
-            3           x_mag
-            4           y_mag
-            5           z_mag
-            6           Hc
-            7           bar_length
-            8           bar_width
-            9           bar_thickness
-            10          vertex Charge (0 for vertices, None for others)
-            11          is Vortex (0 for dipolar nanobars, 1 for vortices, None for vertices)
-            12          flip_count
-            13          vortex_count
+    Supported lattice types:
+        - Square
+        - Square Staircase with thin-thick nanobars
     '''
 
     # INITIALISATION
     def __init__(self, unit_cells_x=25, unit_cells_y=25, vertex_gap=100e-9,
                  interType='dumbbell', periodicBC=False):
         # Lattice Parameters
+        assert interType in ('dumbbell', 'dipole')
         self.unit_cells_x = unit_cells_x
         self.unit_cells_y = unit_cells_y
         self.vertex_gap = vertex_gap
@@ -100,6 +83,7 @@ class ASVI:
 
     def vc_matrix(self, grid=None):
         return self.get_attribute_matrix('v_c', grid)
+
     # SAVE & LOAD FUNCTIONS
     def save(self, file, folder=os.getcwd()):
         '''
@@ -154,16 +138,16 @@ class ASVI:
                 ypos = y * self.unit_cell_len
                 if (x + y) % 2 != 0:
                     if y % 2 == 0:
-                        grid[x].append(NanoBar(xpos, ypos, 0., 1., 0., 0., hc_m, hc_v, hc_std,
+                        grid[x].append(NanoBar(xpos, ypos, 0, 1, 0, 0, hc_m, hc_v, hc_std,
                                                bar_l, bar_w, bar_t, magnetisation, 'macrospin'))
                     else:
-                        grid[x].append(NanoBar(xpos, ypos, 0., 0., 1., 0., hc_m, hc_v, hc_std,
+                        grid[x].append(NanoBar(xpos, ypos, 0, 0, 1, 0, hc_m, hc_v, hc_std,
                                                bar_l, bar_w, bar_t, magnetisation, 'macrospin'))
                 else:
-                    if (x) % 2 == 0 and x != 0 and y != 0 and x != self.side_len_x - 1 and y != self.side_len_x - 1:
-                        grid[x].append(Vertex(xpos, ypos, 0.))
+                    if x % 2 == 0 and x != 0 and y != 0 and x != self.side_len_x - 1 and y != self.side_len_x - 1:
+                        grid[x].append(Vertex(xpos, ypos, 0, v_c=0.))
                     else:
-                        grid[x].append(Vertex(xpos, ypos, None))
+                        grid[x].append(Vertex(xpos, ypos, 0, v_c=None))     # pseudo-vertex only serve as place-holders
         self.lattice = np.asarray(grid, dtype=object)
 
     def square_staircase(self, hc_thin=0.03, hc_thick=0.015, hc_v=0.02, hc_std=0.05, magnetisation=800e3,
@@ -218,9 +202,9 @@ class ASVI:
         return field_steps
 
     # SIMULATION EXECUTABLES
-    def fieldSweep(self, fieldType, Hmax, steps, Htheta, n=10, loops=1, folder=None,
-                   FMR=False, FMR_field=None):
-        '''
+    def fieldSweep(self, fieldType, Hmax, steps, Htheta, n=1, loops=1, folder=None,
+                   FMR=False):
+        """
         Sweeps through the lattice using the designated field type.
         Total number of steps for a full minor loop is (2 * step).
         Allowed FieldTypes are:
@@ -228,7 +212,7 @@ class ASVI:
         The function then performs loops number of minor loops
         The Lattice after each field step gets saved to a folder. if folder is None then the
         function saves the lattice to the current working directory
-        '''
+        """
         # Determine which field type to sweep the lattice
         field_steps = {
             'Sine': self.SineField(Hmax, steps),
@@ -288,28 +272,6 @@ class ASVI:
                  frequency)
         print('SIMULATION COMPLETE!')
 
-    def FMR_HM(self, n=5):
-        grid = copy.deepcopy(self.lattice)
-        Xpos, Ypos = np.nonzero(grid)
-        positions = np.array(list(zip(Xpos, Ypos)))
-
-        freq = []
-        for pos in positions:
-            x = pos[0]
-            y = pos[1]
-            obj = grid[x, y]
-            if type(obj) == NanoBar:
-                if obj.type == 'vortex':
-                    tp = 2
-                elif obj.bar_w > 150e-9:
-                    tp = 1
-                else:
-                    tp = 0
-                B = 1000 * np.linalg.norm(self.Hlocal(x, y, n=n))  # convert to mT
-                frequency = FMR_heatmap(type=tp, field=B, bias=obj.hc_bias)
-                freq.append(frequency)
-        return np.array(freq)
-
     def fieldSweepAnimation(self, folder, figsize=(8, 8), fps=10):
         '''
         Will produce an animation of the lattice as it goes through the field sweep
@@ -348,8 +310,30 @@ class ASVI:
                     writer.grab_frame()
         print('ANIMATION COMPLETE!')
 
+    def FMR_HM(self, n=1):
+        grid = copy.deepcopy(self.lattice)
+        Xpos, Ypos = np.nonzero(grid)
+        positions = np.array(list(zip(Xpos, Ypos)))
+
+        freq = []
+        for pos in positions:
+            x = pos[0]
+            y = pos[1]
+            obj = grid[x, y]
+            if type(obj) == NanoBar:
+                if obj.type == 'vortex':
+                    tp = 2
+                elif obj.bar_w > 150e-9:
+                    tp = 1
+                else:
+                    tp = 0
+                B = 1000 * np.linalg.norm(self.Hlocal(x, y, n=n))  # convert to mT
+                frequency = FMR_heatmap(type=tp, field=B, bias=obj.hc_bias)
+                freq.append(frequency)
+        return np.array(freq)
+
     # CALCULATIONS
-    def relax(self, Happlied=np.array([0., 0., 0.]), n=10):
+    def relax(self, Happlied=np.array([0., 0., 0.]), n=1):
         '''
         Steps through all the the positions in the lattice and if the field applied along the direction
         of the bar is negative and greater than the coercive field then it switches the magnetisation
@@ -495,32 +479,30 @@ class ASVI:
         return (np.nanmean(np.absolute(magcharge)))
 
     def Hlocal(self, x, y, n=1):
+        """
+        calculates the local field at position x, y including the
+        field with n radius with n=1 just including nearest neighbours
+        """
+        grid = self.lattice
+        obj = grid[x, y]
+        r0 = obj.pos
+        x1 = x - n
+        x2 = x + n + 1
+        y1 = y - n
+        y2 = y + n + 1
+
+        Hl = []
         if self.periodicBC:
-            # calculates the local field at position x, y including the
-            # field with n radius with n=1 just including nearest neighbours
-            Hl = []
-            x1 = x - n
-            x2 = x + n + 1
-            y1 = y - n
-            y2 = y + n + 1
             indx = np.arange(x1, x2)
             indy = np.arange(y1, y2)
-            # print(x1,x2,y1,y2)
-            # indpara = np.arange(0,9)
-            # indices = np.meshgrid(indx,indy, indpara)
-            grid = np.take(self.lattice, indx, axis=0, mode='wrap')
-            grid1 = np.take(grid, indy, axis=1, mode='wrap')
-            # print(grid1[:,:,0:2])
-            m = grid1[:, :, 3:6]
-            m = m.reshape(-1, m.shape[-1])
-            r = grid1[:, :, 0:3]
-            r = r.reshape(-1, r.shape[-1])
-            r0 = self.lattice[x, y, 0:3]
-            # if abs(np.linalg.norm(pos-r0))/(n+1)>=1.0:
-            #    pos = np.array([self.side_len_x*self.unit_cell_len, self.side_len_y*self.unit_cell_len, 0])+ pos
-            # r[:,:,0][np.where(abs(np.linalg.norm(r[:,:,0]-r0[0]))/(n+1)>1.0:)] = self.side_len_x*self.unit_cell_len+ r
+            pos_matrix = np.take(self.pos_matrix(), indx, axis=0, mode='wrap')
+            pos_matrix1 = np.take(pos_matrix, indy, axis=1, mode='wrap')
+            mag_matrix = np.take(self.mag_matrix(), indx, axis=0, mode='wrap')
+            mag_matrix1 = np.take(mag_matrix, indy, axis=1, mode='wrap')
+            m = mag_matrix1.reshape(-1, mag_matrix1.shape[-1])
+            r = pos_matrix1.reshape(-1, pos_matrix1.shape[-1])
+
             for pos, mag in zip(r, m):
-                # print(np.linalg.norm(pos-r0)/(self.unit_cell_len*(n+1)))
                 if np.linalg.norm(pos[0] - r0[0]) / (self.unit_cell_len * (n + 1)) > 1.0:
                     if pos[0] - r0[0] < 0:
                         pos[0] = self.side_len_x * self.unit_cell_len + pos[0]
@@ -532,20 +514,14 @@ class ASVI:
                         pos[1] = self.side_len_y * self.unit_cell_len + pos[1]
                     else:
                         pos[1] = pos[1] - self.side_len_y * self.unit_cell_len
-                        # if abs(np.linalg.norm(pos-r0))/(n+1)>1.0:
-                #    pos = np.array([self.side_len_x*self.unit_cell_len, self.side_len_y*self.unit_cell_len, 0])+ pos
-                if np.array_equal(pos, r0) != True:  # abs(np.linalg.norm(pos-r0))/(n+1)<=1.0
-                    Hl.append(self.fieldCalc(mag, r0, pos))
-            return (sum(Hl))
+                if not np.array_equal(pos, r0):
+                    Hl.append(self.fieldCalc(x, y, mag, r0, pos))
+            return sum(Hl)
         else:
-            # calculates the local field at position x, y including the
-            # field with n radius with n=1 just including nearest neighbours
-            Hl = []
             x1 = x - n
             x2 = x + n + 1
             y1 = y - n
             y2 = y + n + 1
-
             if x1 < 0:
                 x1 = 0
             if x2 > self.side_len_x:
@@ -555,9 +531,6 @@ class ASVI:
             if y2 > self.side_len_y - 1:
                 y2 = self.side_len_y - 1
 
-            grid = self.lattice
-            obj = self.lattice[x, y]
-            r0 = obj.pos
             for xi in range(x1, x2):
                 for yi in range(y1, y2):
                     obji = grid[xi, yi]
@@ -616,7 +589,7 @@ class ASVI:
         for x in range(0, self.side_len_x):
             for y in range(0, self.side_len_y):
                 obj = grid[x, y]
-                if type(obj) == Vertex:
+                if type(obj) == Vertex and obj.v_c is not None:
                     x1 = x - 1
                     x2 = x + 2
                     y1 = y - 1
