@@ -20,6 +20,8 @@ class NanoBar:
         if self.type == 'vortex':
             self.set_hc(hc_v, hc_std)
         self.hc_bias = (self.hc - self.hc_m) / self.hc_m
+        # Local field
+        self.h_local = None
         # Material Properties
         self.bar_l = bar_l
         self.bar_w = bar_w

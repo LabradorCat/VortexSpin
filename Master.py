@@ -28,7 +28,12 @@ Hsteps = 20             # Number of steps between the minimum value of the coerc
                         # and the maxium field specified above. Total number of steps in a
                         # minor loop is = (2*steps)
 neighbours = 2          # The radius of neighbouring spins that are included in the local field calculation
-loops = 10              # The number of minor field loops to be done
+loops = 1              # The number of minor field loops to be done
+
+# -----------------------------------------------------------------------------------------------------------------------
+# FMR Parameters
+FMR = True
+FMR_step = 2
 
 # -----------------------------------------------------------------------------------------------------------------------
 # Running Simulation and output results
@@ -51,7 +56,7 @@ if __name__ == '__main__':
     if Simulate:
         shutil.rmtree(folder)
         lattice.fieldSweep(fieldType=Field, Hmax=field_max, steps=Hsteps, Htheta=field_angle,
-                           n=neighbours, loops=loops, folder=folder, FMR=True)
+                           n=neighbours, loops=loops, folder=folder, FMR=FMR, FRM_step=FMR_step)
 
     if Animate:
-        lattice.fieldSweepAnimation(folder, figsize=(40,40), fps=fps)
+        lattice.fieldSweepAnimation(folder, figsize=(size/2, size/2), fps=fps)

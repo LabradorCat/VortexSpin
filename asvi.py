@@ -9,7 +9,7 @@ from tqdm import tqdm
 from plotting import plot_vector_field_2D, FMR_heatmap
 from asvi_materials import NanoBar, Vertex
 
-plt.rcParams['animation.ffmpeg_path'] = r'E:\ASI_MSci_Project\ffmpeg\bin\ffmpeg.exe'
+plt.rcParams['animation.ffmpeg_path'] = os.path.join(os.getcwd(), r'ffmpeg\bin\ffmpeg.exe')
 
 
 class ASVI:
@@ -214,7 +214,7 @@ class ASVI:
 
     # SIMULATION EXECUTABLES
     def fieldSweep(self, fieldType, Hmax, steps, Htheta, n=1, loops=1, folder=None,
-                   FMR=False):
+                   FMR=False, FMR_step=2):
         """
         Sweeps through the lattice using the designated field type.
         Total number of steps for a full minor loop is (2 * step).
@@ -240,14 +240,14 @@ class ASVI:
             angleFactor = np.sin(Hrad)
         # Create statistical parameters
         q, mag, monopole, fieldloops, frequency, vortex_count, macrospin_count = ([] for i in range(7))
-        counter = 0
+        counter = 1
         i = 0
         # Start the field sweep
         print('STARTING SIMULATION WITH {} MINOR LOOPS...'.format(loops))
-        if FMR:
-            freq = self.FMR_HM(n)
-            frequency.append(freq)
         self.relax(n=n)
+        if FMR:
+            freq = self.FMR_HM()
+            frequency.append(freq)
         self.save('InitialASVI_Hmax{:.3f}_steps{}_Angle{:.0f}_n{}_Loops{}'.format(
             Hmax, steps, Htheta, n, loops), folder=folder)
         while i <= loops:
@@ -268,9 +268,9 @@ class ASVI:
                 self.save('ASVIcounter{}_Loop{}_FieldApplied{:.3f}_Angle{:.0f}'.format(
                     counter, i, field, Htheta), folder=folder)
                 counter += 1
-            if FMR:
-                freq = self.FMR_HM(n)
-                frequency.append(freq)
+                if FMR and (counter % FMR_step) == 0:
+                    freq = self.FMR_HM()
+                    frequency.append(freq)
             i += 1
         self.save('FinalASVI_Hmax{:.3f}_steps{}_Angle{:.0f}_n{}_Loops{}'.format(
             Hmax, steps, Htheta, n, loops), folder=folder)
@@ -321,7 +321,7 @@ class ASVI:
                     writer.grab_frame()
         print('ANIMATION COMPLETE!')
 
-    def FMR_HM(self, n=1):
+    def FMR_HM(self):
         grid = copy.deepcopy(self.lattice)
         Xpos, Ypos = np.nonzero(grid)
         positions = np.array(list(zip(Xpos, Ypos)))
@@ -338,7 +338,7 @@ class ASVI:
                     tp = 1
                 else:
                     tp = 0
-                B = 1000 * np.linalg.norm(self.Hlocal(x, y, n=n))  # convert to mT
+                B = 1000 * np.linalg.norm(obj.h_local)  # convert to mT
                 frequency = FMR_heatmap(type=tp, field=B, bias=obj.hc_bias)
                 freq.append(frequency)
         return np.array(freq)
@@ -364,8 +364,9 @@ class ASVI:
                 y = pos[1]
                 obj = grid[x, y]
                 if obj.type == 'macrospin':  # test if object is a macrospin
+                    obj.h_local = self.Hlocal(x, y, n=n)
                     unit_vector = obj.unit_vector
-                    field = np.dot(np.array(Happlied + self.Hlocal(x, y, n=n)), unit_vector)
+                    field = np.dot(np.array(Happlied + obj.h_local), unit_vector)
                     if field < -obj.hc:
                         obj.flip()
                         flipcount += 1
@@ -373,8 +374,9 @@ class ASVI:
                             obj.set_vortex()
                             vortexcount += 1
                 elif obj.type == 'vortex':  # test if object is a vortex
+                    obj.h_local = self.Hlocal(x, y, n=n)
                     unit_vector = obj.unit_vector
-                    field = np.dot(np.array(Happlied + self.Hlocal(x, y, n=n)), unit_vector)
+                    field = np.dot(np.array(Happlied + obj.h_local), unit_vector)
                     if field < -obj.hc:
                         obj.set_macrospin()
                         obj.flip()
