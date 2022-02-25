@@ -28,11 +28,6 @@ class NanoBar:
     def __repr__(self):
         return f'NanoBar({self.pos})'
 
-    def __array__(self):
-        array = np.append(self.pos, self.mag)
-        array = np.append(array, [self.hc, self.bar_l, self.bar_w, self.bar_t])
-        return array
-
     # CLASS GETTER AND SETTER
     def set_mag(self, xmag=None, ymag=None, zmag=None, mag=None):
         """
@@ -91,10 +86,4 @@ class Vertex:
 
     def __repr__(self):
         return f'Vertex({self.pos})'
-
-    def __array__(self):
-        array = np.append(self.pos, self.mag)
-        array = np.append(array, [self.hc, 0, 0, 0])
-        return array
-    # CLASS GETTER AND SETTER
 

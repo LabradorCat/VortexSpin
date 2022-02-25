@@ -2,10 +2,10 @@ import shutil
 import os
 from asvi import ASVI
 
-#-----------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------
 # Material & Lattice Parameters
 # Define the size of the lattice and material properties
-size = 5  ## Dimension of array
+size = 100  ## Dimension of array
 Hc_thin = 0.029  # Coercive Field (T)
 Hc_thick = 0.01625
 Hc_Vortex = 0.026
@@ -19,7 +19,7 @@ magnetisation = 800e3  # Saturation magnetisation of material in A/m (permalloy 
 field_angle = 45.  # Angle at which the field will be applied in degrees
 field_max = 0.023  # Maximum field to by applied at field angle measured in Telsa
 
-#-----------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------
 # Simulation Parameters
 Field = 'Sine_train'      # Type of Field used to sweep the lattice
 InterType = 'dumbbell'  # Type of interaction (dumbbell or dipole)
@@ -30,13 +30,13 @@ Hsteps = 20             # Number of steps between the minimum value of the coerc
 neighbours = 2          # The radius of neighbouring spins that are included in the local field calculation
 loops = 10              # The number of minor field loops to be done
 
-#-----------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------
 # Running Simulation and output results
 output_folder_name = 'ASVI_Simulation_Output' # Simulation results export to 'output_folder_name' in the parent directory
 fps = 10    # Animation fps
 # Select what to perform in this run
-Simulate = True
-Animate = True
+Simulate = False
+Animate = False
 
 if __name__ == '__main__':
     folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir, output_folder_name))
@@ -54,4 +54,4 @@ if __name__ == '__main__':
                            n=neighbours, loops=loops, folder=folder, FMR=True)
 
     if Animate:
-        lattice.fieldSweepAnimation(folder, fps=fps)
+        lattice.fieldSweepAnimation(folder, figsize=(40,40), fps=fps)
