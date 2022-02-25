@@ -56,7 +56,7 @@ if __name__ == '__main__':
     if Simulate:
         shutil.rmtree(folder)
         lattice.fieldSweep(fieldType=Field, Hmax=field_max, steps=Hsteps, Htheta=field_angle,
-                           n=neighbours, loops=loops, folder=folder, FMR=FMR, FRM_step=FMR_step)
+                           n=neighbours, loops=loops, folder=folder, FMR=FMR, FMR_step=FMR_step)
 
     if Animate:
         lattice.fieldSweepAnimation(folder, figsize=(size/2, size/2), fps=fps)
