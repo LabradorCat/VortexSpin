@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import csv
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib import cm
@@ -69,9 +70,7 @@ def plot_applied_field(field):
     ax.set_xlabel('Steps')
     ax.set_ylabel('Applied Field (mT)')
     ax.set_title('Applied Field on the Lattice')
-    ax.plot(steps, 1000 * field, 'k-')
-    # ax.plot(int(file[file.find('counter') + 7:file.find(r'_Loop')]), H_applied,
-    #          marker='o', markersize=3, markerfacecolor='red', markeredgecolor='red')
+    ax.plot(steps, 1000 * field, 'o')
     plt.show()
 
 
@@ -176,10 +175,10 @@ def plot_FMR(FMR_frequency):
         return np.exp(log_pdf)
     # Setting color code
     num_plots = len(FMR_frequency)
-    offset = 2
+    offset = 0.2
     f_max = np.max(FMR_frequency) + offset
     f_min = np.min(FMR_frequency) - offset
-    f_arr = np.arange(f_min, f_max, 0.01)
+    f_arr = np.arange(f_min, f_max, 0.02)
     # Plotting
     fig.suptitle('FMR Spectrum')
     ax1.set_xlabel('Frequency (GHz)')
@@ -189,21 +188,31 @@ def plot_FMR(FMR_frequency):
     ax2.set_ylabel('Probability')
 
     loop = 0
+    FMR_data = []
     for i in range(0, num_plots):
         freq = FMR_frequency[i]
         f_pdf = kde_sklearn(freq, f_arr, bandwidth=0.2)
+        FMR_data.append(f_pdf)
         if i == 0:
             ax1.hist(freq, bins=10, histtype='step', label='Initial', color = 'blue', linewidth=2, alpha=1)
             ax2.plot(f_arr, f_pdf, label='Initial', color = 'blue', linewidth=2, alpha=1)
         elif i == num_plots - 1:
             ax1.hist(freq, bins=10, histtype='step', label='Final', color='red', linewidth=2, alpha=1)
             ax2.plot(f_arr, f_pdf, label='Final', color='red', linewidth=2, alpha=1)
-        elif i % 5 == 0:
+        elif i % 3 == 0:
             ax1.hist(freq, bins=10, histtype='step', label=f'loop {loop}', linewidth=3, alpha=0.5)
             ax2.plot(f_arr, f_pdf, label=f'loop {loop}', linewidth=3, alpha=0.5)
         loop += 1
     ax1.legend(loc='upper left')
     ax2.legend(loc='upper left')
+    # Export FMR spectrum to csv file
+    csv_header = []
+    for i in range(len(f_arr)):
+        csv_header.append(f'IQ{i}')
+    with open('FMR_data.csv', 'w') as file:
+        writer = csv.writer(file)
+        writer.writerow(csv_header)
+        writer.writerows(FMR_data)
 
 
 def FMR_heatmap(type=0, field=0, bias=0, display_FMR_heatmap=False):
@@ -231,12 +240,12 @@ def FMR_heatmap(type=0, field=0, bias=0, display_FMR_heatmap=False):
 
 
 if __name__ == '__main__':
-    folder = 'E:\ASI_MSci_Project\ASVI_Simulation_Output'
+    folder = 'D:\ASI_MSci_Project\ASVI_Simulation_Output'
     vc = load_summary(folder, output='vortex_count')
     mc = load_summary(folder, output='macrospin_count')
     fd = load_summary(folder, output='fieldloops')
     FMR_f = load_summary(folder, output='FMR_frequency')
-    plot_applied_field(fd)
-    #plot_vortex_macrospin_number(vc, mc, 'exp')
-    #FMR_heatmap(display_FMR_heatmap=True)
+    # plot_applied_field(fd)
+    # plot_vortex_macrospin_number(vc, mc, 'exp')
+    # FMR_heatmap(display_FMR_heatmap=True)
     plot_FMR(FMR_f)
