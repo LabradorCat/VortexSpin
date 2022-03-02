@@ -161,7 +161,7 @@ def plot_vector_field_2D(asvi, fig, ax, color=None):
     return ax
 
 
-def plot_FMR(FMR_frequency):
+def plot_FMR(FMR_frequency, steps):
 
     fig, axes = plt.subplots(1, 2, constrained_layout=True)
     ax1, ax2 = axes[0], axes[1]
@@ -199,7 +199,7 @@ def plot_FMR(FMR_frequency):
         elif i == num_plots - 1:
             ax1.hist(freq, bins=10, histtype='step', label='Final', color='red', linewidth=2, alpha=1)
             ax2.plot(f_arr, f_pdf, label='Final', color='red', linewidth=2, alpha=1)
-        elif i % 3 == 0:
+        elif i % steps == 0:
             ax1.hist(freq, bins=10, histtype='step', label=f'loop {loop}', linewidth=3, alpha=0.5)
             ax2.plot(f_arr, f_pdf, label=f'loop {loop}', linewidth=3, alpha=0.5)
         loop += 1
@@ -248,4 +248,4 @@ if __name__ == '__main__':
     # plot_applied_field(fd)
     # plot_vortex_macrospin_number(vc, mc, 'exp')
     # FMR_heatmap(display_FMR_heatmap=True)
-    plot_FMR(FMR_f)
+    plot_FMR(FMR_f, steps=30)

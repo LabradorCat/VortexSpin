@@ -172,7 +172,7 @@ class ASVI:
         self.lattice = grid
 
     # APPLIED FIELD TYPES
-    def AdaptiveField(self, Hmax, steps):
+    def AdaptiveField(self, steps, Hmax):
         '''
         Return array of field steps ranging from minimum Coercive field to Hmax
         Applied fields go from positive to negative
@@ -183,7 +183,7 @@ class ASVI:
         field_steps = np.append(field_steps, np.negative(field_steps))
         return field_steps
 
-    def SineField(self, Hmax, steps):
+    def SineField(self, steps, Hmax):
         '''
         return a array of field sweep values from 0 to Hmax in the form of a sine wave
         (2 * steps) field values in a period
@@ -191,18 +191,24 @@ class ASVI:
         field_steps = Hmax * np.sin(np.linspace(0, 2 * np.pi, 2 * steps))
         return field_steps
 
-    def LinearField(self, Hmax, steps):
+    def LinearField(self, steps, Hmax, Hmin):
         '''
         Return a array of field steps linearly increasing field from Hmin to Hmax
         (steps) number of field values
         '''
-        hc_min = np.nanmin(self.hc_matrix())
+        if Hmin is None:
+            hc_min = np.nanmin(self.hc_matrix())
+        else:
+            hc_min = Hmin
         field_steps = np.linspace(hc_min - 0.006, Hmax, steps)
         field_steps = np.negative(field_steps)
         return field_steps
 
-    def SinFieldTrain(self, Hmax, steps):
-        hc_min = np.nanmin(self.hc_matrix())
+    def SinFieldTrain(self, steps, Hmax, Hmin):
+        if Hmin is None:
+            hc_min = np.nanmin(self.hc_matrix())
+        else:
+            hc_min = Hmin
         amp = (Hmax - hc_min) / 2
         offset = Hmax - amp
         steps = np.linspace(0, 2 * np.pi, 2 * steps, endpoint=False)
@@ -213,8 +219,8 @@ class ASVI:
         return field_steps
 
     # SIMULATION EXECUTABLES
-    def fieldSweep(self, fieldType, Hmax, steps, Htheta, n=1, loops=1, folder=None,
-                   FMR=False, FMR_step=2):
+    def fieldSweep(self, fieldType, steps, Hmax, Hmin=None, Htheta=45, n=1, loops=1, folder=None,
+                   FMR=False, FMR_step=2, FMR_field=None):
         """
         Sweeps through the lattice using the designated field type.
         Total number of steps for a full minor loop is (2 * step).
@@ -226,10 +232,10 @@ class ASVI:
         """
         # Determine which field type to sweep the lattice
         field_steps = {
-            'Sine': self.SineField(Hmax, steps),
-            'Sine_train': self.SinFieldTrain(Hmax, steps),
-            'Adaptive': self.AdaptiveField(Hmax, steps),
-            'Linear': self.LinearField(Hmax, steps)
+            'Sine': self.SineField(steps, Hmax),
+            'Sine_train': self.SinFieldTrain(steps, Hmax, Hmin),
+            'Adaptive': self.AdaptiveField(steps, Hmax),
+            'Linear': self.LinearField(steps, Hmax, Hmin)
         }.get(fieldType, Exception('Field sweep type not defined'))
         # Working out field angle and amend field steps
         self.field_angle = Htheta
@@ -269,7 +275,11 @@ class ASVI:
                     counter, i, field, Htheta), folder=folder)
                 counter += 1
                 if FMR and (counter % FMR_step) == 0:
-                    freq = self.FMR_HM()
+                    if FMR_field is None:
+                        h_app = Happlied
+                    else:
+                        h_app = FMR_field * np.array([np.cos(Hrad), np.sin(Hrad), 0.])
+                    freq = self.FMR_HM(h_app=h_app)
                     frequency.append(freq)
             i += 1
         self.save('FinalASVI_Hmax{:.3f}_steps{}_Angle{:.0f}_n{}_Loops{}'.format(
@@ -321,12 +331,15 @@ class ASVI:
                     writer.grab_frame()
         print('ANIMATION COMPLETE!')
 
-    def FMR_HM(self):
+    def FMR_HM(self, h_app=None):
+        if h_app is None:
+            h_app = [0, 0, 0]
+        h_app = np.array([h_app])
         grid = copy.deepcopy(self.lattice)
         Xpos, Ypos = np.nonzero(grid)
         positions = np.array(list(zip(Xpos, Ypos)))
 
-        freq = []
+        freq = np.array([])
         for pos in positions:
             x = pos[0]
             y = pos[1]
@@ -338,54 +351,50 @@ class ASVI:
                     tp = 1
                 else:
                     tp = 0
-                B = 1000 * np.linalg.norm(obj.h_local)  # convert to mT
+                B = 1000 * np.dot(np.array(h_app + obj.h_local), obj.unit_vector)  # convert to mT
                 frequency = FMR_heatmap(type=tp, field=B, bias=obj.hc_bias)
-                freq.append(frequency)
+                freq = np.append(freq, frequency)
         return np.array(freq)
 
     # CALCULATIONS
-    def relax(self, Happlied=np.array([0., 0., 0.]), n=1):
+    def relax(self, Happlied=None, n=1):
         '''
         Steps through all the the positions in the lattice and if the field applied along the direction
         of the bar is negative and greater than the coercive field then it switches the magnetisation
         of the bar
         '''
+        if Happlied is None:
+            Happlied = np.array([0, 0, 0], dtype=float)
         grid = copy.deepcopy(self.lattice)
         unrelaxed = True
         Xpos, Ypos = np.nonzero(grid)
         positions = np.array(list(zip(Xpos, Ypos)))
 
-        while unrelaxed == True:
-            flipcount = 0
-            vortexcount = 0
-            positions_new = np.random.permutation(positions)
-            for pos in positions_new:
-                x = pos[0]
-                y = pos[1]
-                obj = grid[x, y]
-                if obj.type == 'macrospin':  # test if object is a macrospin
-                    obj.h_local = self.Hlocal(x, y, n=n)
-                    unit_vector = obj.unit_vector
-                    field = np.dot(np.array(Happlied + obj.h_local), unit_vector)
-                    if field < -obj.hc:
-                        obj.flip()
-                        flipcount += 1
-                        if np.random.random() <= self.vortex_prob(x, y):
-                            obj.set_vortex()
-                            vortexcount += 1
-                elif obj.type == 'vortex':  # test if object is a vortex
-                    obj.h_local = self.Hlocal(x, y, n=n)
-                    unit_vector = obj.unit_vector
-                    field = np.dot(np.array(Happlied + obj.h_local), unit_vector)
-                    if field < -obj.hc:
-                        obj.set_macrospin()
-                        obj.flip()
-
-            if flipcount > 0:
-                unrelaxed = True
-            else:
-                unrelaxed = False
-            self.lattice = grid
+        flipcount = 0
+        vortexcount = 0
+        positions_new = np.random.permutation(positions)
+        for pos in positions_new:
+            x = pos[0]
+            y = pos[1]
+            obj = grid[x, y]
+            if obj.type == 'macrospin':  # test if object is a macrospin
+                obj.h_local = self.Hlocal(x, y, n=n)
+                unit_vector = obj.unit_vector
+                field = np.dot(np.array(Happlied + obj.h_local), unit_vector)
+                if field < -obj.hc:
+                    obj.flip()
+                    flipcount += 1
+                    if np.random.random() <= self.vortex_prob(x, y):
+                        obj.set_vortex()
+                        vortexcount += 1
+            elif obj.type == 'vortex':  # test if object is a vortex
+                obj.h_local = self.Hlocal(x, y, n=n)
+                unit_vector = obj.unit_vector
+                field = np.dot(np.array(Happlied + obj.h_local), unit_vector)
+                if field < -obj.hc:
+                    obj.set_macrospin()
+                    obj.flip()
+        self.lattice = grid
 
     def count_vortex(self, lattice=None):
         '''
