@@ -253,7 +253,7 @@ class ASVI:
         self.relax(n=n)
         if FMR:
             freq = self.FMR_HM()
-            frequency.append(freq)
+            frequency.append(np.append([0, 0], freq))
         self.save('InitialASVI_Hmax{:.3f}_steps{}_Angle{:.0f}_n{}_Loops{}'.format(
             Hmax, steps, Htheta, n, loops), folder=folder)
         while i <= loops:
@@ -264,6 +264,17 @@ class ASVI:
                 self.applied_field = f_exp
                 Happlied = f_exp * np.array([np.cos(Hrad), np.sin(Hrad), 0.])
                 self.relax(Happlied, n)
+                # applying FMR measurements
+                if FMR and (counter % FMR_step) == 0:
+                    if FMR_field is None:
+                        h_app = Happlied
+                        h_app2 = f_exp
+                    else:
+                        h_app = FMR_field * np.array([np.cos(Hrad), np.sin(Hrad), 0.])
+                        h_app2 = FMR_field
+                    print([f_exp, h_app2])
+                    freq = self.FMR_HM(h_app=h_app)
+                    frequency.append(np.append([f_exp, h_app2], freq))
                 # saving statistical data
                 q.append(self.correlation(self.previous, self))
                 mag.append(self.netMagnetisation())
@@ -274,13 +285,6 @@ class ASVI:
                 self.save('ASVIcounter{}_Loop{}_FieldApplied{:.3f}_Angle{:.0f}'.format(
                     counter, i, field, Htheta), folder=folder)
                 counter += 1
-                if FMR and (counter % FMR_step) == 0:
-                    if FMR_field is None:
-                        h_app = Happlied
-                    else:
-                        h_app = FMR_field * np.array([np.cos(Hrad), np.sin(Hrad), 0.])
-                    freq = self.FMR_HM(h_app=h_app)
-                    frequency.append(freq)
             i += 1
         self.save('FinalASVI_Hmax{:.3f}_steps{}_Angle{:.0f}_n{}_Loops{}'.format(
             Hmax, steps, Htheta, n, loops), folder=folder)

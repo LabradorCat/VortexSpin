@@ -178,7 +178,7 @@ def plot_FMR(FMR_frequency, steps):
     offset = 0.2
     f_max = np.max(FMR_frequency) + offset
     f_min = np.min(FMR_frequency) - offset
-    f_arr = np.arange(f_min, f_max, 0.02)
+    f_arr = np.arange(f_min, f_max, 0.03)
     # Plotting
     fig.suptitle('FMR Spectrum')
     ax1.set_xlabel('Frequency (GHz)')
@@ -190,12 +190,14 @@ def plot_FMR(FMR_frequency, steps):
     loop = 0
     FMR_data = []
     for i in range(0, num_plots):
-        freq = FMR_frequency[i]
+        h_app = FMR_frequency[i, 0]
+        h_app2 = FMR_frequency[i, 1]
+        freq = FMR_frequency[i, 2:]
         f_pdf = kde_sklearn(freq, f_arr, bandwidth=0.2)
-        FMR_data.append(f_pdf)
+        FMR_data.append(np.append([h_app, h_app2], f_pdf))
         if i == 0:
-            ax1.hist(freq, bins=10, histtype='step', label='Initial', color = 'blue', linewidth=2, alpha=1)
-            ax2.plot(f_arr, f_pdf, label='Initial', color = 'blue', linewidth=2, alpha=1)
+            ax1.hist(freq, bins=10, histtype='step', label='Initial', color='blue', linewidth=2, alpha=1)
+            ax2.plot(f_arr, f_pdf, label='Initial', color='blue', linewidth=2, alpha=1)
         elif i == num_plots - 1:
             ax1.hist(freq, bins=10, histtype='step', label='Final', color='red', linewidth=2, alpha=1)
             ax2.plot(f_arr, f_pdf, label='Final', color='red', linewidth=2, alpha=1)
@@ -206,7 +208,7 @@ def plot_FMR(FMR_frequency, steps):
     ax1.legend(loc='upper left')
     ax2.legend(loc='upper left')
     # Export FMR spectrum to csv file
-    csv_header = []
+    csv_header = ['H_app', 'H_app2']
     for i in range(len(f_arr)):
         csv_header.append(f'IQ{i}')
     with open('FMR_data.csv', 'w') as file:

@@ -28,13 +28,14 @@ Hsteps = 15                 # Number of steps between the minimum value of the c
                             # and the maxium field specified above. Total number of steps in a
                             # minor loop is = (2*steps)
 neighbours = 2              # The radius of neighbouring spins that are included in the local field calculation
-loops = 10                   # The number of minor field loops to be done
+loops = 0                   # The number of minor field loops to be done
 
 # -----------------------------------------------------------------------------------------------------------------------
 # FMR Parameters
 FMR = True
 FMR_step = 2
 FMR_field = None
+
 # -----------------------------------------------------------------------------------------------------------------------
 # Running Simulation and output results
 output_folder_name = 'ASVI_Simulation_Output'   # export to 'output_folder_name' in the parent directory
