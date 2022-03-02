@@ -65,12 +65,21 @@ def load_summary(folder, output):
 
 def plot_applied_field(field):
     # plotting external field
+    fig, axes = plt.subplots(1, 2, sharex=True)
+    fig.suptitle('Applied Field on the Lattice')
+    ax1, ax2 = axes[0], axes[1]
+
     steps = np.arange(0, len(field), 1)
-    fig, ax = plt.subplots()
-    ax.set_xlabel('Steps')
-    ax.set_ylabel('Applied Field (mT)')
-    ax.set_title('Applied Field on the Lattice')
-    ax.plot(steps, 1000 * field, 'o')
+    ax1.set_xlabel('Steps')
+    ax1.set_ylabel('Applied Field (mT)')
+    ax1.plot(steps, 1000 * field, 'o')
+
+    field = field[field > 0]
+    steps = 2 * np.arange(0, len(field), 1)
+    ax2.set_xlabel('Steps')
+    ax2.set_ylabel('Applied Field (mT)')
+    ax2.plot(steps, 1000 * field, 'o')
+    ax2.plot(steps, 1000 * field, 'k--')
     plt.show()
 
 
@@ -247,7 +256,7 @@ if __name__ == '__main__':
     mc = load_summary(folder, output='macrospin_count')
     fd = load_summary(folder, output='fieldloops')
     FMR_f = load_summary(folder, output='FMR_frequency')
-    # plot_applied_field(fd)
+    plot_applied_field(fd)
     # plot_vortex_macrospin_number(vc, mc, 'exp')
     # FMR_heatmap(display_FMR_heatmap=True)
-    plot_FMR(FMR_f, steps=30)
+    plot_FMR(FMR_f, steps=100)

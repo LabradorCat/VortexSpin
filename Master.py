@@ -21,10 +21,10 @@ field_max = 0.0235          # Maximum field to by applied at field angle measure
 field_min = 0.0180          # Minimum field to by applied at field angle measured in Telsa
 # -----------------------------------------------------------------------------------------------------------------------
 # Simulation Parameters
-Field = 'Sine_train'        # Type of Field used to sweep the lattice
+Field = 'MackeyGlass'        # Type of Field used to sweep the lattice
 InterType = 'dumbbell'      # Type of interaction (dumbbell or dipole)
 PeriodicBC = False        # Apply periodic boundary condition
-Hsteps = 15                 # Number of steps between the minimum value of the coercive field
+Hsteps = 300                 # Number of steps between the minimum value of the coercive field
                             # and the maxium field specified above. Total number of steps in a
                             # minor loop is = (2*steps)
 neighbours = 2              # The radius of neighbouring spins that are included in the local field calculation

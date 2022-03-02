@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as manimation
 import numpy.linalg
+import collections
 from tqdm import tqdm
 # Vortex Spin Modules
 from plotting import plot_vector_field_2D, FMR_heatmap
@@ -218,6 +219,52 @@ class ASVI:
             field_steps = np.append(field_steps, [field, -field])
         return field_steps
 
+    def MackeyGlass(self, steps, Hmax, Hmin, tau=17, seed=None, n_samples=1):
+        '''
+        Generate the Mackey Glass time-series. Parameters are:
+            - step: length of the time-series in timesteps, larger than 200 for best performance
+            - tau: delay of the MG - system. Commonly used values are tau=17 (mild
+              chaos) and tau=30 (moderate chaos). Default is 17.
+            - seed: to seed the random generator, can be used to generate the same
+              timeseries at each invocation.
+            - n_samples : number of samples to generate
+        '''
+        if Hmin is None:
+            Hmin = np.nanmin(self.hc_matrix())
+
+        delta_t = 10
+        history_len = tau * delta_t
+        # Initial conditions for the history of the system
+        timeseries = 1.2
+
+        if seed is not None:
+            np.random.seed(seed)
+        samples = []
+        for _ in range(n_samples):
+            history = collections.deque(1.2 * np.ones(history_len) + 0.2 * (np.random.rand(history_len) - 0.5))
+            # Preallocate the array for the time-series
+            inp = np.zeros((steps, 1))
+            for timestep in range(steps):
+                for _ in range(delta_t):
+                    xtau = history.popleft()
+                    history.append(timeseries)
+                    timeseries = history[-1] + (0.2 * xtau / (1.0 + xtau ** 10) - 0.1 * history[-1]) / delta_t
+                inp[timestep] = timeseries
+            # Squash timeseries through tanh
+            inp = np.tanh(inp - 1)
+            samples.append(inp)
+            samples = np.array(samples).flatten()
+            # Setting boundary and amplitude
+            amp = (Hmax - Hmin) / 2
+            off = Hmax - 0.75 * amp
+            samples *= 2.5 * amp
+            samples += off
+
+        field_steps = np.array([])
+        for f in samples:
+            field_steps = np.append(field_steps, [f, -f])
+        return field_steps
+
     # SIMULATION EXECUTABLES
     def fieldSweep(self, fieldType, steps, Hmax, Hmin=None, Htheta=45, n=1, loops=1, folder=None,
                    FMR=False, FMR_step=2, FMR_field=None):
@@ -235,7 +282,8 @@ class ASVI:
             'Sine': self.SineField(steps, Hmax),
             'Sine_train': self.SinFieldTrain(steps, Hmax, Hmin),
             'Adaptive': self.AdaptiveField(steps, Hmax),
-            'Linear': self.LinearField(steps, Hmax, Hmin)
+            'Linear': self.LinearField(steps, Hmax, Hmin),
+            'MackeyGlass': self.MackeyGlass(steps, Hmax, Hmin)
         }.get(fieldType, Exception('Field sweep type not defined'))
         # Working out field angle and amend field steps
         self.field_angle = Htheta
@@ -272,7 +320,6 @@ class ASVI:
                     else:
                         h_app = FMR_field * np.array([np.cos(Hrad), np.sin(Hrad), 0.])
                         h_app2 = FMR_field
-                    print([f_exp, h_app2])
                     freq = self.FMR_HM(h_app=h_app)
                     frequency.append(np.append([f_exp, h_app2], freq))
                 # saving statistical data
