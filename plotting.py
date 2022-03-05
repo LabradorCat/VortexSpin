@@ -2,6 +2,7 @@ import numpy as np
 import os
 import csv
 from tqdm import tqdm
+import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.animation as manimation
 from matplotlib.colors import BoundaryNorm, ListedColormap, Normalize
@@ -169,10 +170,7 @@ def plot_vector_field_2D(asvi, fig, ax, color=None):
     return ax
 
 
-def plot_FMR(data, steps, fmin=4.5, fmax=10.5, bins=395, bandwidth=0.01,):
-
-    fig, axes = plt.subplots(1, 2, constrained_layout=True)
-    ax1, ax2 = axes[0], axes[1]
+def FMR_specturm(data, plotting=False, steps=100, fmin=4.5, fmax=10.5, bins=396, bandwidth=0.01):
 
     def kde_sklearn(x, x_grid, bandwidth, **kwargs):
         """Kernel Density Estimation with Scikit-learn"""
@@ -184,45 +182,56 @@ def plot_FMR(data, steps, fmin=4.5, fmax=10.5, bins=395, bandwidth=0.01,):
     # Setting color code
     num_plots = len(data)
     f_arr = np.linspace(fmin, fmax, bins, endpoint=False)
+
     # Plotting
-    fig.suptitle('FMR Spectrum')
-    ax1.set_xlabel('Frequency (GHz)')
-    ax1.set_ylabel('Occurrence')
-    ax1.set_xlim(fmin, fmax)
-    ax2.set_xlabel('Frequency (GHz)')
-    ax2.set_ylabel('Probability')
+    if plotting:
+        fig, axes = plt.subplots(1, 2, constrained_layout=True)
+        ax1, ax2 = axes[0], axes[1]
+        fig.suptitle('FMR Spectrum')
+        ax1.set_xlabel('Frequency (GHz)')
+        ax1.set_ylabel('Occurrence')
+        ax1.set_xlim(fmin, fmax)
+        ax2.set_xlabel('Frequency (GHz)')
+        ax2.set_ylabel('Probability')
 
     loop = 0
-    FMR_data = []
-    for i in range(0, num_plots):
+    FMR_data1 = []      # histogram data
+    FMR_data2 = []      # kde data
+    for i in tqdm(range(0, num_plots), desc='Spectrum analysis progress: ', unit='step'):
         h_app = data[i, 0]
         h_app2 = data[i, 1]
         freq = data[i, 2:]
-        f_pdf = kde_sklearn(freq, f_arr, bandwidth=0.01)
-        FMR_data.append(np.append([h_app, h_app2], f_pdf))
-        if i == 0:
-            ax1.hist(freq, bins=bins, histtype='step', label='Initial', color='blue', linewidth=2, alpha=1)
-            ax2.plot(f_arr, f_pdf, label='Initial', color='blue', linewidth=2, alpha=1)
-        elif i == num_plots - 1:
-            ax1.hist(freq, bins=bins, histtype='step', label='Final', color='red', linewidth=2, alpha=1)
-            ax2.plot(f_arr, f_pdf, label='Final', color='red', linewidth=2, alpha=1)
-        elif i % steps == 0:
-            ax1.hist(freq, bins=bins, histtype='step', label=f'loop {loop}', linewidth=3, alpha=0.5)
-            ax2.plot(f_arr, f_pdf, label=f'loop {loop}', linewidth=3, alpha=0.5)
+        f_pdf = kde_sklearn(freq, f_arr, bandwidth=bandwidth)
+        hist, bin_edge = np.histogram(freq, bins=bins, range=(fmin, fmax))
+        FMR_data1.append(np.append([h_app, h_app2], hist))
+        FMR_data2.append(np.append([h_app, h_app2], f_pdf))
+        if plotting:
+            if i == 0:
+                ax1.hist(freq, bins=bins, histtype='step', label='Initial', color='blue', linewidth=2, alpha=1)
+                ax2.plot(f_arr, f_pdf, label='Initial', color='blue', linewidth=2, alpha=1)
+            elif i == num_plots - 1:
+                ax1.hist(freq, bins=bins, histtype='step', label='Final', color='red', linewidth=2, alpha=1)
+                ax2.plot(f_arr, f_pdf, label='Final', color='red', linewidth=2, alpha=1)
+            elif i % steps == 0:
+                ax1.hist(freq, bins=bins, histtype='step', label=f'loop {loop}', linewidth=3, alpha=0.5)
+                ax2.plot(f_arr, f_pdf, label=f'loop {loop}', linewidth=3, alpha=0.5)
+            ax1.legend(loc='upper left')
+            ax2.legend(loc='upper left')
         loop += 1
-    ax1.legend(loc='upper left')
-    ax2.legend(loc='upper left')
-    # Export FMR spectrum to csv file
-    csv_header = ['H_app', 'H_app2']
+    # Export FMR spectrum to excel file
+    header = ['H_app', 'H_app2']
     for i in range(len(f_arr)):
-        csv_header.append(f'IQ{i}')
-    with open('FMR_data.csv', 'w') as file:
-        writer = csv.writer(file)
-        writer.writerow(csv_header)
-        writer.writerows(FMR_data)
+        header.append(f'IQ{i}')
+    df_hist = pd.DataFrame(data=FMR_data1, columns=header)
+    df_kde = pd.DataFrame(data=FMR_data2, columns=header)
+    # Write each dataframe to a different worksheet.
+    with pd.ExcelWriter('sim_all_data_MG.xlsx', engine='xlsxwriter') as writer:
+        df_hist.to_excel(writer, sheet_name='hist')
+        df_kde.to_excel(writer, sheet_name=f'kde_bw{bandwidth}')
+    print('Output Successful!')
 
 
-def FMR_animation(folder, fps=10, figsize=(8,8)):
+def FMR_animation(folder, fps=10, figsize=(8, 8)):
     print('STARTING TO MAKE FMR ANIMATION...')
     FFMpegWriter = manimation.writers['ffmpeg']
     metadata = dict(title='FMR Simulation', artist='Matplotlib',
@@ -241,7 +250,6 @@ def FMR_animation(folder, fps=10, figsize=(8,8)):
         spectrum = np.array(spectrum, dtype=float)
 
     with writer.saving(fig, (os.path.join(folder, "FMR_animation.mp4")), 100):
-
         for i, spec in enumerate(tqdm(spectrum, desc='FMR animation progress: ', unit='frame')):
             x = np.linspace(0, len(spec), len(spec), endpoint=False)
             spec = np.array(spec)
@@ -286,5 +294,5 @@ if __name__ == '__main__':
     # plot_applied_field(fd)
     # plot_vortex_macrospin_number(vc, mc, 'exp')
     # FMR_heatmap(display_FMR_heatmap=True)
-    plot_FMR(FMR_f, steps=100)
-    FMR_animation(folder)
+    FMR_specturm(FMR_f, plotting=True, steps=100, fmin=4.5, fmax=10.5, bins=396, bandwidth=0.01)
+    # FMR_animation(folder)
