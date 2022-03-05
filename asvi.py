@@ -9,6 +9,7 @@ from tqdm import tqdm
 # Vortex Spin Modules
 from plotting import plot_vector_field_2D, FMR_heatmap
 from asvi_materials import NanoBar, Vertex
+from fields import *
 
 plt.rcParams['animation.ffmpeg_path'] = os.path.join(os.getcwd(), r'ffmpeg\bin\ffmpeg.exe')
 
@@ -38,8 +39,12 @@ class ASVI:
         # Simulation Parameters
         self.interType = interType
         self.periodicBC = periodicBC
-        self.applied_field = None
+        self.field_steps = None
         self.field_angle = None
+        self.applied_field = None
+        self.Hmax = None
+        self.Hmin = None
+        self.steps = None
 
     # LATTICE PROPERTIES GETTING & SETTING
     def returnLattice(self):
@@ -172,102 +177,38 @@ class ASVI:
                     obj.set_hc(hc_thick, hc_std)
         self.lattice = grid
 
-    # APPLIED FIELD TYPES
-    def AdaptiveField(self, steps, Hmax):
-        '''
-        Return array of field steps ranging from minimum Coercive field to Hmax
-        Applied fields go from positive to negative
-        (2 * steps) field values in a period
-        '''
-        hc_min = np.nanmin(self.hc_matrix())
-        field_steps = np.linspace(hc_min, Hmax, steps)
-        field_steps = np.append(field_steps, np.negative(field_steps))
-        return field_steps
-
-    def SineField(self, steps, Hmax):
-        '''
-        return a array of field sweep values from 0 to Hmax in the form of a sine wave
-        (2 * steps) field values in a period
-        '''
-        field_steps = Hmax * np.sin(np.linspace(0, 2 * np.pi, 2 * steps))
-        return field_steps
-
-    def LinearField(self, steps, Hmax, Hmin):
-        '''
-        Return a array of field steps linearly increasing field from Hmin to Hmax
-        (steps) number of field values
-        '''
-        if Hmin is None:
-            hc_min = np.nanmin(self.hc_matrix())
-        else:
-            hc_min = Hmin
-        field_steps = np.linspace(hc_min - 0.006, Hmax, steps)
-        field_steps = np.negative(field_steps)
-        return field_steps
-
-    def SinFieldTrain(self, steps, Hmax, Hmin):
-        if Hmin is None:
-            hc_min = np.nanmin(self.hc_matrix())
-        else:
-            hc_min = Hmin
-        amp = (Hmax - hc_min) / 2
-        offset = Hmax - amp
-        steps = np.linspace(0, 2 * np.pi, 2 * steps, endpoint=False)
-        field_steps = np.array([])
-        for i in steps:
-            field = amp * np.sin(i) + offset
-            field_steps = np.append(field_steps, [field, -field])
-        return field_steps
-
-    def MackeyGlass(self, steps, Hmax, Hmin, tau=17, seed=None, n_samples=1):
-        '''
-        Generate the Mackey Glass time-series. Parameters are:
-            - step: length of the time-series in timesteps, larger than 200 for best performance
-            - tau: delay of the MG - system. Commonly used values are tau=17 (mild
-              chaos) and tau=30 (moderate chaos). Default is 17.
-            - seed: to seed the random generator, can be used to generate the same
-              timeseries at each invocation.
-            - n_samples : number of samples to generate
-        '''
-        if Hmin is None:
-            Hmin = np.nanmin(self.hc_matrix())
-
-        delta_t = 10
-        history_len = tau * delta_t
-        # Initial conditions for the history of the system
-        timeseries = 1.2
-
-        if seed is not None:
-            np.random.seed(seed)
-        samples = []
-        for _ in range(n_samples):
-            history = collections.deque(1.2 * np.ones(history_len) + 0.2 * (np.random.rand(history_len) - 0.5))
-            # Preallocate the array for the time-series
-            inp = np.zeros((steps, 1))
-            for timestep in range(steps):
-                for _ in range(delta_t):
-                    xtau = history.popleft()
-                    history.append(timeseries)
-                    timeseries = history[-1] + (0.2 * xtau / (1.0 + xtau ** 10) - 0.1 * history[-1]) / delta_t
-                inp[timestep] = timeseries
-            # Squash timeseries through tanh
-            inp = np.tanh(inp - 1)
-            samples.append(inp)
-            samples = np.array(samples).flatten()
-            # Setting boundary and amplitude
-            amp = (Hmax - Hmin) / 2
-            off = Hmax - 0.75 * amp
-            samples *= 2.5 * amp
-            samples += off
-
-        field_steps = np.array([])
-        for f in samples:
-            field_steps = np.append(field_steps, [f, -f])
-        return field_steps
-
     # SIMULATION EXECUTABLES
-    def fieldSweep(self, fieldType, steps, Hmax, Hmin=None, Htheta=45, n=1, loops=1, folder=None,
-                   FMR=False, FMR_step=2, FMR_field=None):
+    def fieldSelect(self, fieldType, steps, Hmax, Hmin=None, Htheta=45):
+        if fieldType == 'Sine':
+            if Hmin is None:
+                Hmin = - Hmax
+            self.field_steps = Sine(steps, Hmax, Hmin)
+        elif fieldType == 'Adaptive':
+            if Hmin is None:
+                Hmin = np.nanmin(self.hc_matrix())
+            self.field_steps = Adaptive(steps, Hmax, Hmin)
+        elif fieldType == 'Linear':
+            if Hmin is None:
+                Hmin = - Hmax
+            self.field_steps = Linear(steps, Hmax, Hmin)
+        elif fieldType == 'Sine_Train':
+            if Hmin is None:
+                Hmin = np.nanmin(self.hc_matrix())
+            self.field_steps = Sine_Train(steps, Hmax, Hmin)
+        elif fieldType == 'MackeyGlass':
+            if Hmin is None:
+                Hmin = np.nanmin(self.hc_matrix())
+            self.field_steps = MackeyGlass_Train(steps, Hmax, Hmin)
+        elif fieldType == 'MackeyGlass_exp':
+            self.field_steps = MackeyGlass_exp()
+        else:
+            raise TypeError('fieldType not included!')
+        self.Hmin = Hmin
+        self.Hmax = Hmax
+        self.field_angle = Htheta
+        self.steps = len(self.field_steps)
+
+    def fieldSweep(self, n=1, loops=1, folder=None, FMR=False, FMR_step=2, FMR_field=None):
         """
         Sweeps through the lattice using the designated field type.
         Total number of steps for a full minor loop is (2 * step).
@@ -278,16 +219,10 @@ class ASVI:
         function saves the lattice to the current working directory
         """
         # Determine which field type to sweep the lattice
-        field_steps = {
-            'Sine': self.SineField(steps, Hmax),
-            'Sine_train': self.SinFieldTrain(steps, Hmax, Hmin),
-            'Adaptive': self.AdaptiveField(steps, Hmax),
-            'Linear': self.LinearField(steps, Hmax, Hmin),
-            'MackeyGlass': self.MackeyGlass(steps, Hmax, Hmin)
-        }.get(fieldType, Exception('Field sweep type not defined'))
+
         # Working out field angle and amend field steps
-        self.field_angle = Htheta
-        Hrad = np.deg2rad(Htheta)
+        Hrad = np.deg2rad(self.field_angle)
+        Hmax, steps, Htheta = self.Hmax, self.steps, self.field_angle
         if np.sin(Hrad) == 0:
             angleFactor = np.cos(Hrad)
         else:
@@ -306,8 +241,7 @@ class ASVI:
             Hmax, steps, Htheta, n, loops), folder=folder)
         while i <= loops:
             self.previous = copy.deepcopy(self)
-            for field in tqdm(field_steps, desc='Simulation Loop {} Progress: '.format(i),
-                              unit='step'):
+            for field in tqdm(self.field_steps, desc='Simulation Loop {} Progress: '.format(i), unit='step'):
                 f_exp = field / angleFactor
                 self.applied_field = f_exp
                 Happlied = f_exp * np.array([np.cos(Hrad), np.sin(Hrad), 0.])
@@ -382,31 +316,6 @@ class ASVI:
                     writer.grab_frame()
         print('ANIMATION COMPLETE!')
 
-    def FMR_HM(self, h_app=None):
-        if h_app is None:
-            h_app = [0, 0, 0]
-        h_app = np.array([h_app])
-        grid = copy.deepcopy(self.lattice)
-        Xpos, Ypos = np.nonzero(grid)
-        positions = np.array(list(zip(Xpos, Ypos)))
-
-        freq = np.array([])
-        for pos in positions:
-            x = pos[0]
-            y = pos[1]
-            obj = grid[x, y]
-            if type(obj) == NanoBar:
-                if obj.type == 'vortex':
-                    tp = 2
-                elif obj.bar_w > 150e-9:
-                    tp = 1
-                else:
-                    tp = 0
-                B = 1000 * np.dot(np.array(h_app + obj.h_local), obj.unit_vector)  # convert to mT
-                frequency = FMR_heatmap(type=tp, field=B, bias=obj.hc_bias)
-                freq = np.append(freq, frequency)
-        return np.array(freq)
-
     # CALCULATIONS
     def relax(self, Happlied=None, n=1):
         '''
@@ -416,13 +325,10 @@ class ASVI:
         '''
         if Happlied is None:
             Happlied = np.array([0, 0, 0], dtype=float)
+
         grid = copy.deepcopy(self.lattice)
-        unrelaxed = True
         Xpos, Ypos = np.nonzero(grid)
         positions = np.array(list(zip(Xpos, Ypos)))
-
-        flipcount = 0
-        vortexcount = 0
         positions_new = np.random.permutation(positions)
         for pos in positions_new:
             x = pos[0]
@@ -434,10 +340,8 @@ class ASVI:
                 field = np.dot(np.array(Happlied + obj.h_local), unit_vector)
                 if field < -obj.hc:
                     obj.flip()
-                    flipcount += 1
                     if np.random.random() <= self.vortex_prob(x, y):
                         obj.set_vortex()
-                        vortexcount += 1
             elif obj.type == 'vortex':  # test if object is a vortex
                 obj.h_local = self.Hlocal(x, y, n=n)
                 unit_vector = obj.unit_vector
@@ -446,110 +350,6 @@ class ASVI:
                     obj.set_macrospin()
                     obj.flip()
         self.lattice = grid
-
-    def count_vortex(self, lattice=None):
-        '''
-        Count the number of vortices in the lattice
-        '''
-        if lattice is None:
-            lattice = self.lattice
-        count = 0
-        xpos, ypos = np.nonzero(lattice)
-        positions = np.array(list(zip(xpos, ypos)))
-        for pos in positions:
-            obj = lattice[pos[0], pos[1]]
-            if obj.type == 'vortex':
-                count += 1
-        return count
-
-    def count_macrospin(self, lattice=None):
-        '''
-            Count the number of vortices in the lattice
-        '''
-        if lattice is None:
-            lattice = self.lattice
-        count = 0
-        xpos, ypos = np.nonzero(lattice)
-        positions = np.array(list(zip(xpos, ypos)))
-        for pos in positions:
-            obj = lattice[pos[0], pos[1]]
-            if obj.type == 'macrospin':
-                count += 1
-        return count
-
-    def vortex_prob(self, x, y, v_n=2):
-        x1 = x - v_n
-        x2 = x + v_n + 1
-        y1 = y - v_n
-        y2 = y + v_n + 1
-        if x1 < 0:
-            x1 = 0
-        if x2 > self.side_len_x:
-            x2 = self.side_len_x
-        if y1 < 0:
-            y1 = 0
-        if y2 > self.side_len_y:
-            y2 = self.side_len_y
-
-        grid = self.lattice
-        neighbour = grid[x1:x2, y1:y2]
-        bar_width = grid[x, y].bar_w
-        min_width = 100e-9
-        vortex_prob = 0
-        if bar_width > min_width:  # thin bar below min_width cannot form vortex
-            vortex_count = self.count_vortex(neighbour)
-            if self.applied_field < 0:
-                vortex_prob = 0.02 * vortex_count + 0.0305  # slightly more likely for vortex to from beside vortices
-            else:
-                vortex_prob = 0.02 * vortex_count + 0.0134
-        return vortex_prob
-
-    def correlation(self, lattice1, lattice2):
-        '''
-        Returns the correlation between lattice1 and lattice2
-        '''
-
-        l1 = lattice1.returnLattice()
-        l2 = lattice2.returnLattice()
-        total = 0
-        same = 0
-        for x in range(0, self.side_len_x):
-            for y in range(0, self.side_len_y):
-                obj1 = l1[x, y]
-                obj2 = l2[x, y]
-                if obj1.hc != 0:
-                    if np.array_equal(obj1.mag, obj2.mag):
-                        same += 1.0
-                    total += 1.0
-        return (same / total)
-
-    def netMagnetisation(self):
-        '''
-        returns the magnetisation in the x and y directions
-        '''
-        grid = copy.deepcopy(self.lattice)
-        mx, my, mz = (np.array([], dtype=float) for i in range(3))
-        xpos, ypos = np.nonzero(grid)
-        positions = np.array(list(zip(xpos, ypos)))
-        for pos in positions:
-            obj = grid[pos[0], pos[1]]
-            if type(obj) == NanoBar:
-                mx = np.append(mx, obj.mag[0])
-                my = np.append(my, obj.mag[1])
-                mz = np.append(mz, obj.mag[2])
-        return np.array([np.nanmean(mx), np.nanmean(my), np.nanmean(mz)])
-
-    def monopoleDensity(self):
-        '''
-        Returns the monopole density of a square or kagome lattice
-        '''
-        # 4in/0out have a charge of 1
-        # 3in/1out have a charge of 0.5
-        #   The density is then calculated by dividing by the total area minus the edges
-        self.vertexCharge()
-        grid = self.lattice
-        magcharge = self.vc_matrix(grid).flatten()
-        return (np.nanmean(np.absolute(magcharge)))
 
     def Hlocal(self, x, y, n=1):
         """
@@ -688,5 +488,136 @@ class ASVI:
                     obj.v_c = charge
 
         self.lattice = grid
+
+    def FMR_HM(self, h_app=None):
+        if h_app is None:
+            h_app = [0, 0, 0]
+        h_app = np.array([h_app])
+        grid = copy.deepcopy(self.lattice)
+        Xpos, Ypos = np.nonzero(grid)
+        positions = np.array(list(zip(Xpos, Ypos)))
+
+        freq = np.array([])
+        for pos in positions:
+            x = pos[0]
+            y = pos[1]
+            obj = grid[x, y]
+            if type(obj) == NanoBar:
+                if obj.type == 'vortex':
+                    tp = 2
+                elif obj.bar_w > 150e-9:
+                    tp = 1
+                else:
+                    tp = 0
+                B = 1000 * np.dot(np.array(h_app + obj.h_local), obj.unit_vector)  # convert to mT
+                frequency = FMR_heatmap(type=tp, field=B, bias=obj.hc_bias)
+                freq = np.append(freq, frequency)
+        return np.array(freq)
+
+    # STATISTICS
+    def count_vortex(self, lattice=None):
+        '''
+        Count the number of vortices in the lattice
+        '''
+        if lattice is None:
+            lattice = self.lattice
+        count = 0
+        xpos, ypos = np.nonzero(lattice)
+        positions = np.array(list(zip(xpos, ypos)))
+        for pos in positions:
+            obj = lattice[pos[0], pos[1]]
+            if obj.type == 'vortex':
+                count += 1
+        return count
+
+    def count_macrospin(self, lattice=None):
+        '''
+            Count the number of vortices in the lattice
+        '''
+        if lattice is None:
+            lattice = self.lattice
+        count = 0
+        xpos, ypos = np.nonzero(lattice)
+        positions = np.array(list(zip(xpos, ypos)))
+        for pos in positions:
+            obj = lattice[pos[0], pos[1]]
+            if obj.type == 'macrospin':
+                count += 1
+        return count
+
+    def vortex_prob(self, x, y, v_n=2):
+        x1 = x - v_n
+        x2 = x + v_n + 1
+        y1 = y - v_n
+        y2 = y + v_n + 1
+        if x1 < 0:
+            x1 = 0
+        if x2 > self.side_len_x:
+            x2 = self.side_len_x
+        if y1 < 0:
+            y1 = 0
+        if y2 > self.side_len_y:
+            y2 = self.side_len_y
+
+        grid = self.lattice
+        neighbour = grid[x1:x2, y1:y2]
+        bar_width = grid[x, y].bar_w
+        min_width = 100e-9
+        vortex_prob = 0
+        if bar_width > min_width:  # thin bar below min_width cannot form vortex
+            vortex_count = self.count_vortex(neighbour)
+            if self.applied_field < 0:
+                vortex_prob = 0.02 * vortex_count + 0.0305  # slightly more likely for vortex to from beside vortices
+            else:
+                vortex_prob = 0.02 * vortex_count + 0.0134
+        return vortex_prob
+
+    def correlation(self, lattice1, lattice2):
+        '''
+        Returns the correlation between lattice1 and lattice2
+        '''
+
+        l1 = lattice1.returnLattice()
+        l2 = lattice2.returnLattice()
+        total = 0
+        same = 0
+        for x in range(0, self.side_len_x):
+            for y in range(0, self.side_len_y):
+                obj1 = l1[x, y]
+                obj2 = l2[x, y]
+                if obj1.hc != 0:
+                    if np.array_equal(obj1.mag, obj2.mag):
+                        same += 1.0
+                    total += 1.0
+        return (same / total)
+
+    def netMagnetisation(self):
+        '''
+        returns the magnetisation in the x and y directions
+        '''
+        grid = copy.deepcopy(self.lattice)
+        mx, my, mz = (np.array([], dtype=float) for i in range(3))
+        xpos, ypos = np.nonzero(grid)
+        positions = np.array(list(zip(xpos, ypos)))
+        for pos in positions:
+            obj = grid[pos[0], pos[1]]
+            if type(obj) == NanoBar:
+                mx = np.append(mx, obj.mag[0])
+                my = np.append(my, obj.mag[1])
+                mz = np.append(mz, obj.mag[2])
+        return np.array([np.nanmean(mx), np.nanmean(my), np.nanmean(mz)])
+
+    def monopoleDensity(self):
+        '''
+        Returns the monopole density of a square or kagome lattice
+        '''
+        # 4in/0out have a charge of 1
+        # 3in/1out have a charge of 0.5
+        #   The density is then calculated by dividing by the total area minus the edges
+        self.vertexCharge()
+        grid = self.lattice
+        magcharge = self.vc_matrix(grid).flatten()
+        return (np.nanmean(np.absolute(magcharge)))
+
 
 

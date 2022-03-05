@@ -1,14 +1,13 @@
 import numpy as np
 import os
 import csv
-import matplotlib as mpl
+from tqdm import tqdm
 import matplotlib.pyplot as plt
-from matplotlib import cm
+import matplotlib.animation as manimation
 from matplotlib.colors import BoundaryNorm, ListedColormap, Normalize
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.optimize import curve_fit
-from scipy.stats import gaussian_kde
 from sklearn.neighbors import KernelDensity
+plt.rcParams['animation.ffmpeg_path'] = os.path.join(os.getcwd(), r'ffmpeg\bin\ffmpeg.exe')
 
 # Customized colormap for nanobars
 clist1 = list('bkr')
@@ -170,12 +169,12 @@ def plot_vector_field_2D(asvi, fig, ax, color=None):
     return ax
 
 
-def plot_FMR(FMR_frequency, steps):
+def plot_FMR(data, steps, fmin=4.5, fmax=10.5, bins=395, bandwidth=0.01,):
 
     fig, axes = plt.subplots(1, 2, constrained_layout=True)
     ax1, ax2 = axes[0], axes[1]
 
-    def kde_sklearn(x, x_grid, bandwidth=0.2, **kwargs):
+    def kde_sklearn(x, x_grid, bandwidth, **kwargs):
         """Kernel Density Estimation with Scikit-learn"""
         kde_skl = KernelDensity(bandwidth=bandwidth, **kwargs)
         kde_skl.fit(x[:, np.newaxis])
@@ -183,35 +182,32 @@ def plot_FMR(FMR_frequency, steps):
         log_pdf = kde_skl.score_samples(x_grid[:, np.newaxis])
         return np.exp(log_pdf)
     # Setting color code
-    num_plots = len(FMR_frequency)
-    offset = 0.2
-    f_max = np.max(FMR_frequency) + offset
-    f_min = np.min(FMR_frequency) - offset
-    f_arr = np.arange(f_min, f_max, 0.03)
+    num_plots = len(data)
+    f_arr = np.linspace(fmin, fmax, bins, endpoint=False)
     # Plotting
     fig.suptitle('FMR Spectrum')
     ax1.set_xlabel('Frequency (GHz)')
     ax1.set_ylabel('Occurrence')
-    ax1.set_xlim(f_min, f_max)
+    ax1.set_xlim(fmin, fmax)
     ax2.set_xlabel('Frequency (GHz)')
     ax2.set_ylabel('Probability')
 
     loop = 0
     FMR_data = []
     for i in range(0, num_plots):
-        h_app = FMR_frequency[i, 0]
-        h_app2 = FMR_frequency[i, 1]
-        freq = FMR_frequency[i, 2:]
-        f_pdf = kde_sklearn(freq, f_arr, bandwidth=0.2)
+        h_app = data[i, 0]
+        h_app2 = data[i, 1]
+        freq = data[i, 2:]
+        f_pdf = kde_sklearn(freq, f_arr, bandwidth=0.01)
         FMR_data.append(np.append([h_app, h_app2], f_pdf))
         if i == 0:
-            ax1.hist(freq, bins=10, histtype='step', label='Initial', color='blue', linewidth=2, alpha=1)
+            ax1.hist(freq, bins=bins, histtype='step', label='Initial', color='blue', linewidth=2, alpha=1)
             ax2.plot(f_arr, f_pdf, label='Initial', color='blue', linewidth=2, alpha=1)
         elif i == num_plots - 1:
-            ax1.hist(freq, bins=10, histtype='step', label='Final', color='red', linewidth=2, alpha=1)
+            ax1.hist(freq, bins=bins, histtype='step', label='Final', color='red', linewidth=2, alpha=1)
             ax2.plot(f_arr, f_pdf, label='Final', color='red', linewidth=2, alpha=1)
         elif i % steps == 0:
-            ax1.hist(freq, bins=10, histtype='step', label=f'loop {loop}', linewidth=3, alpha=0.5)
+            ax1.hist(freq, bins=bins, histtype='step', label=f'loop {loop}', linewidth=3, alpha=0.5)
             ax2.plot(f_arr, f_pdf, label=f'loop {loop}', linewidth=3, alpha=0.5)
         loop += 1
     ax1.legend(loc='upper left')
@@ -225,6 +221,37 @@ def plot_FMR(FMR_frequency, steps):
         writer.writerow(csv_header)
         writer.writerows(FMR_data)
 
+
+def FMR_animation(folder, fps=10, figsize=(8,8)):
+    print('STARTING TO MAKE FMR ANIMATION...')
+    FFMpegWriter = manimation.writers['ffmpeg']
+    metadata = dict(title='FMR Simulation', artist='Matplotlib',
+                    comment='FMR spectrum evolution animation')
+    writer = FFMpegWriter(fps=fps, metadata=metadata)
+    fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
+
+    with open('FMR_data.csv', 'r') as file:
+        reader = csv.reader(file)
+        header = next(reader)
+        spectrum = []
+        if header != None:
+            for row in reader:
+                if row != []:
+                    spectrum.append(row[2:])
+        spectrum = np.array(spectrum, dtype=float)
+
+    with writer.saving(fig, (os.path.join(folder, "FMR_animation.mp4")), 100):
+
+        for i, spec in enumerate(tqdm(spectrum, desc='FMR animation progress: ', unit='frame')):
+            x = np.linspace(0, len(spec), len(spec), endpoint=False)
+            spec = np.array(spec)
+            ax.clear()
+            ax.set_ylim(0, 2)
+            ax.set_title('FMR Spectrum', loc='center', pad=20)
+            ax.set_title(f"Steps: {i}", loc='left', pad=20)
+            ax.plot(x, spec, 'k-', linewidth=2)
+            writer.grab_frame()
+    print('ANIMATION COMPLETE!')
 
 def FMR_heatmap(type=0, field=0, bias=0, display_FMR_heatmap=False):
     if display_FMR_heatmap:
@@ -256,7 +283,8 @@ if __name__ == '__main__':
     mc = load_summary(folder, output='macrospin_count')
     fd = load_summary(folder, output='fieldloops')
     FMR_f = load_summary(folder, output='FMR_frequency')
-    plot_applied_field(fd)
+    # plot_applied_field(fd)
     # plot_vortex_macrospin_number(vc, mc, 'exp')
     # FMR_heatmap(display_FMR_heatmap=True)
     plot_FMR(FMR_f, steps=100)
+    FMR_animation(folder)

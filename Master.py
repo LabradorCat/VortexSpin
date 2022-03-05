@@ -21,10 +21,10 @@ field_max = 0.0235          # Maximum field to by applied at field angle measure
 field_min = 0.0180          # Minimum field to by applied at field angle measured in Telsa
 # -----------------------------------------------------------------------------------------------------------------------
 # Simulation Parameters
-Field = 'MackeyGlass'        # Type of Field used to sweep the lattice
+Field = 'MackeyGlass_exp'        # Type of Field used to sweep the lattice
 InterType = 'dumbbell'      # Type of interaction (dumbbell or dipole)
 PeriodicBC = False        # Apply periodic boundary condition
-Hsteps = 300                 # Number of steps between the minimum value of the coercive field
+Hsteps = 0                 # Number of steps between the minimum value of the coercive field
                             # and the maxium field specified above. Total number of steps in a
                             # minor loop is = (2*steps)
 neighbours = 2              # The radius of neighbouring spins that are included in the local field calculation
@@ -57,8 +57,8 @@ if __name__ == '__main__':
 
     if Simulate:
         shutil.rmtree(folder)
-        lattice.fieldSweep(fieldType=Field, steps=Hsteps, Hmax=field_max, Hmin=field_min, Htheta=field_angle,
-                           n=neighbours, loops=loops, folder=folder, FMR=FMR, FMR_step=FMR_step, FMR_field=FMR_field)
+        lattice.fieldSelect(fieldType=Field, steps=Hsteps, Hmax=field_max, Hmin=field_min, Htheta=field_angle)
+        lattice.fieldSweep(n=neighbours, loops=loops, folder=folder, FMR=FMR, FMR_step=FMR_step, FMR_field=FMR_field)
 
     if Animate:
         lattice.fieldSweepAnimation(folder, figsize=animation_size, fps=fps)
