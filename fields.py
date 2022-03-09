@@ -13,6 +13,13 @@ def MackeyGlass_exp():
         field_steps = np.append(field_steps, [f, -f])
     return field_steps / 10000
 
+def Sine_exp():
+    samples = H_app_df['Sine'].to_numpy()
+    field_steps = np.array([])
+    for f in samples:
+        field_steps = np.append(field_steps, [f, -f])
+    return field_steps / 10000
+
 def Adaptive(steps, Hmax, Hmin):
     '''
     Return array of field steps ranging from minimum Coercive field to Hmax

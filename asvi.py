@@ -201,6 +201,8 @@ class ASVI:
             self.field_steps = MackeyGlass_Train(steps, Hmax, Hmin)
         elif fieldType == 'MackeyGlass_exp':
             self.field_steps = MackeyGlass_exp()
+        elif fieldType == 'Sine_exp':
+            self.field_steps = Sine_exp()
         else:
             raise TypeError('fieldType not included!')
         self.Hmin = Hmin
@@ -234,9 +236,6 @@ class ASVI:
         # Start the field sweep
         print('STARTING SIMULATION WITH {} MINOR LOOPS...'.format(loops))
         self.relax(n=n)
-        if FMR:
-            freq = self.FMR_HM()
-            frequency.append(np.append([0, 0], freq))
         self.save('InitialASVI_Hmax{:.3f}_steps{}_Angle{:.0f}_n{}_Loops{}'.format(
             Hmax, steps, Htheta, n, loops), folder=folder)
         while i <= loops:

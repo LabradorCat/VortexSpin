@@ -5,7 +5,7 @@ from asvi import ASVI
 # -----------------------------------------------------------------------------------------------------------------------
 # Material & Lattice Parameters
 # Define the size of the lattice and material properties
-size = 10                # Dimension of array
+size = 100               # Dimension of array
 Hc_thin = 0.029             # Coercive Fields (T)
 Hc_thick = 0.01625
 Hc_Vortex = 0.026
@@ -21,7 +21,7 @@ field_max = 0.0235          # Maximum field to by applied at field angle measure
 field_min = 0.0180          # Minimum field to by applied at field angle measured in Telsa
 # -----------------------------------------------------------------------------------------------------------------------
 # Simulation Parameters
-Field = 'MackeyGlass_exp'        # Type of Field used to sweep the lattice
+Field = 'Sine_exp'        # Type of Field used to sweep the lattice
 InterType = 'dumbbell'      # Type of interaction (dumbbell or dipole)
 PeriodicBC = False        # Apply periodic boundary condition
 Hsteps = 0                 # Number of steps between the minimum value of the coercive field
@@ -40,7 +40,7 @@ FMR_field = None
 # Running Simulation and output results
 output_folder_name = 'ASVI_Simulation_Output'   # export to 'output_folder_name' in the parent directory
 fps = 10                                        # Animation fps
-animation_size = (10, 10)                        # Animation figure size
+animation_size = (40, 40)                        # Animation figure size
 # Select what to perform in this run
 Simulate = True
 Animate = True
