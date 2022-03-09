@@ -225,13 +225,13 @@ def FMR_specturm(data, plotting=False, steps=100, fmin=4.5, fmax=10.5, bins=396,
     df_hist = pd.DataFrame(data=FMR_data1, columns=header)
     df_kde = pd.DataFrame(data=FMR_data2, columns=header)
     # Write each dataframe to a different worksheet.
-    with pd.ExcelWriter('sim_all_data_MG.xlsx', engine='xlsxwriter') as writer:
+    with pd.ExcelWriter('sim_all_data.xlsx', engine='xlsxwriter') as writer:
         df_hist.to_excel(writer, sheet_name='hist')
         df_kde.to_excel(writer, sheet_name=f'kde_bw{bandwidth}')
     print('Output Successful!')
 
 
-def FMR_animation(folder, fps=10, figsize=(8, 8)):
+def FMR_animation(FMR_file, sheet_name, output_folder, fps=10, figsize=(8, 8)):
     print('STARTING TO MAKE FMR ANIMATION...')
     FFMpegWriter = manimation.writers['ffmpeg']
     metadata = dict(title='FMR Simulation', artist='Matplotlib',
@@ -239,17 +239,11 @@ def FMR_animation(folder, fps=10, figsize=(8, 8)):
     writer = FFMpegWriter(fps=fps, metadata=metadata)
     fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
 
-    with open('FMR_data.csv', 'r') as file:
-        reader = csv.reader(file)
-        header = next(reader)
-        spectrum = []
-        if header != None:
-            for row in reader:
-                if row != []:
-                    spectrum.append(row[2:])
-        spectrum = np.array(spectrum, dtype=float)
+    FMR_df = pd.read_excel(FMR_file, sheet_name=sheet_name)
+    FMR_arr = FMR_df.to_numpy()
+    spectrum = FMR_arr[:, 3:]
 
-    with writer.saving(fig, (os.path.join(folder, "FMR_animation.mp4")), 100):
+    with writer.saving(fig, (os.path.join(output_folder, "FMR_animation.mp4")), 100):
         for i, spec in enumerate(tqdm(spectrum, desc='FMR animation progress: ', unit='frame')):
             x = np.linspace(0, len(spec), len(spec), endpoint=False)
             spec = np.array(spec)
@@ -260,6 +254,7 @@ def FMR_animation(folder, fps=10, figsize=(8, 8)):
             ax.plot(x, spec, 'k-', linewidth=2)
             writer.grab_frame()
     print('ANIMATION COMPLETE!')
+
 
 def FMR_heatmap(type=0, field=0, bias=0, display_FMR_heatmap=False):
     if display_FMR_heatmap:
@@ -291,8 +286,7 @@ if __name__ == '__main__':
     mc = load_summary(folder, output='macrospin_count')
     fd = load_summary(folder, output='fieldloops')
     FMR_f = load_summary(folder, output='FMR_frequency')
-    # plot_applied_field(fd)
     # plot_vortex_macrospin_number(vc, mc, 'exp')
-    # FMR_heatmap(display_FMR_heatmap=True)
-    FMR_specturm(FMR_f, plotting=True, steps=100, fmin=4.5, fmax=10.5, bins=396, bandwidth=0.01)
-    # FMR_animation(folder)
+    # plot_applied_field(fd)
+    # FMR_specturm(FMR_f, plotting=True, steps=100, fmin=4.5, fmax=10.5, bins=396, bandwidth=0.01)
+    FMR_animation(FMR_file='sim_all_data.xlsx', sheet_name='kde_bw0.01', output_folder=folder)
