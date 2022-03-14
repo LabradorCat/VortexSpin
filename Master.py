@@ -8,8 +8,9 @@ from asvi import ASVI
 size = 100               # Dimension of array
 Hc_thin = 0.029             # Coercive Fields (T)
 Hc_thick = 0.01625
-Hc_Vortex = 0.026
-Hc_std = 0.015              # Stanard deviation in the coercive field (as a percentage)
+Hc_vortex = 0.022
+Hc_std = 0.015               # Standard deviation in the coercive field (percentage)
+Hc_v_std = 0.03             # Standard deviation in the vortex coercive field (percentage)
 vertex_gap = 100e-9         # Vertex gap in m
 bar_length = 600e-9         # Bar length in m
 bar_thickness = 20e-9       # Bar thickness in m
@@ -21,10 +22,10 @@ field_max = 0.0235          # Maximum field to by applied at field angle measure
 field_min = 0.0180          # Minimum field to by applied at field angle measured in Telsa
 # -----------------------------------------------------------------------------------------------------------------------
 # Simulation Parameters
-Field = 'Sine_exp'        # Type of Field used to sweep the lattice
+Field = 'Sine_exp'      # Type of Field used to sweep the lattice
 InterType = 'dumbbell'      # Type of interaction (dumbbell or dipole)
 PeriodicBC = False        # Apply periodic boundary condition
-Hsteps = 0                 # Number of steps between the minimum value of the coercive field
+Hsteps = 0               # Number of steps between the minimum value of the coercive field
                             # and the maxium field specified above. Total number of steps in a
                             # minor loop is = (2*steps)
 neighbours = 2              # The radius of neighbouring spins that are included in the local field calculation
@@ -40,7 +41,7 @@ FMR_field = None
 # Running Simulation and output results
 output_folder_name = 'ASVI_Simulation_Output'   # export to 'output_folder_name' in the parent directory
 fps = 10                                        # Animation fps
-animation_size = (40, 40)                        # Animation figure size
+animation_size = (10, 10)                        # Animation figure size
 # Select what to perform in this run
 Simulate = True
 Animate = True
@@ -49,7 +50,7 @@ if __name__ == '__main__':
     folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir, output_folder_name))
     # Generate ASVI Class model
     lattice = ASVI(size, size, vertex_gap, InterType, PeriodicBC)
-    lattice.square_staircase(Hc_thin, Hc_thick, Hc_Vortex, Hc_std, magnetisation,
+    lattice.square_staircase(Hc_thin, Hc_thick, Hc_vortex, Hc_std, Hc_v_std, magnetisation,
                              bar_length, thin_bar_width, thick_bar_width, bar_thickness)
 
     if not os.path.exists(folder):
