@@ -170,7 +170,7 @@ def plot_vector_field_2D(asvi, fig, ax, color=None):
     return ax
 
 
-def FMR_specturm(data, plotting=False, steps=100, fmin=4.5, fmax=10.5, bins=396, bandwidth=0.01):
+def FMR_specturm(data, folder, plotting=False, steps=100, fmin=4.5, fmax=10.5, bins=396, bandwidth=0.01):
 
     def kde_sklearn(x, x_grid, bandwidth, **kwargs):
         """Kernel Density Estimation with Scikit-learn"""
@@ -197,7 +197,7 @@ def FMR_specturm(data, plotting=False, steps=100, fmin=4.5, fmax=10.5, bins=396,
     loop = 0
     FMR_data1 = []      # histogram data
     FMR_data2 = []      # kde data
-    for i in tqdm(range(0, num_plots), desc='Spectrum analysis progress: ', unit='step'):
+    for i in tqdm(range(0, num_plots-10), desc='Spectrum analysis progress: ', unit='step'):
         h_app = data[i, 0]
         h_app2 = data[i, 1]
         freq = data[i, 2:]
@@ -225,7 +225,7 @@ def FMR_specturm(data, plotting=False, steps=100, fmin=4.5, fmax=10.5, bins=396,
     df_hist = pd.DataFrame(data=FMR_data1, columns=header)
     df_kde = pd.DataFrame(data=FMR_data2, columns=header)
     # Write each dataframe to a different worksheet.
-    with pd.ExcelWriter('sim_all_data.xlsx', engine='xlsxwriter') as writer:
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df_hist.to_excel(writer, sheet_name='hist')
         df_kde.to_excel(writer, sheet_name=f'kde_bw{bandwidth}')
     print('Output Successful!')
@@ -282,11 +282,14 @@ def FMR_heatmap(type=0, field=0, bias=0, display_FMR_heatmap=False):
 
 if __name__ == '__main__':
     folder = 'D:\ASI_MSci_Project\ASVI_Simulation_Output'
+    FMR_output = 'D:\ASI_MSci_Project\ASVI_Predictions'
+    FMR_file_name = 'sim_all_data.xlsx'
+    output = os.path.join(FMR_output, FMR_file_name)
     vc = load_summary(folder, output='vortex_count')
     mc = load_summary(folder, output='macrospin_count')
     fd = load_summary(folder, output='fieldloops')
     FMR_f = load_summary(folder, output='FMR_frequency')
     # plot_vortex_macrospin_number(vc, mc, 'exp')
     # plot_applied_field(fd)
-    # FMR_specturm(FMR_f, plotting=True, steps=100, fmin=4.5, fmax=10.5, bins=396, bandwidth=0.01)
-    FMR_animation(FMR_file='sim_all_data.xlsx', sheet_name='kde_bw0.01', output_folder=folder)
+    # FMR_specturm(FMR_f, output, plotting=False, steps=300, fmin=2.0, fmax=10.5, bins=396, bandwidth=0.1)
+    FMR_animation(FMR_file=output, sheet_name='kde_bw0.1', output_folder=folder)
