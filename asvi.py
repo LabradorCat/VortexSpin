@@ -123,8 +123,8 @@ class ASVI:
         self.lattice = npzfile['arr_0']
 
     # LATTICE TYPES
-    def square(self, hc_m=0.03, hc_v=0.02, hc_std=0.05, magnetisation=800e3,
-               bar_l=600e-9, bar_w=125e-9, bar_t=20e-9):
+    def square(self, hc_m=0.03, hc_v=0.02, hc_std=0.05, hc_v_std=0.03,
+               magnetisation=800e3, bar_l=600e-9, bar_w=125e-9, bar_t=20e-9):
         '''
         Defines the lattice positions, magnetisation directions and coercive fields of an array of
         square ASI
@@ -144,10 +144,10 @@ class ASVI:
                 ypos = y * self.unit_cell_len
                 if (x + y) % 2 != 0:
                     if y % 2 == 0:
-                        grid[x].append(NanoBar(xpos, ypos, 0, 1, 0, 0, hc_m, hc_v, hc_std,
+                        grid[x].append(NanoBar(xpos, ypos, 0, 1, 0, 0, hc_m, hc_v, hc_std, hc_v_std,
                                                bar_l, bar_w, bar_t, magnetisation, 'macrospin'))
                     else:
-                        grid[x].append(NanoBar(xpos, ypos, 0, 0, 1, 0, hc_m, hc_v, hc_std,
+                        grid[x].append(NanoBar(xpos, ypos, 0, 0, 1, 0, hc_m, hc_v, hc_std, hc_v_std,
                                                bar_l, bar_w, bar_t, magnetisation, 'macrospin'))
                 else:
                     if x % 2 == 0 and x != 0 and y != 0 and x != self.side_len_x - 1 and y != self.side_len_x - 1:
@@ -156,9 +156,9 @@ class ASVI:
                         grid[x].append(Vertex(xpos, ypos, 0, v_c=None))     # pseudo-vertex only serve as place-holders
         self.lattice = np.asarray(grid, dtype=object)
 
-    def square_staircase(self, hc_thin=0.03, hc_thick=0.015, hc_v=0.02, hc_std=0.05, magnetisation=800e3,
+    def square_staircase(self, hc_thin=0.03, hc_thick=0.015, hc_v=0.02, hc_std=0.05, hc_v_std=0.03, magnetisation=800e3,
                          bar_l=600e-9, thin_bar_w=125e-9, thick_bar_w=200e-9, bar_t=20e-9):
-        self.square(hc_thin, hc_v, hc_std, magnetisation, bar_l, thin_bar_w, bar_t)
+        self.square(hc_thin, hc_v, hc_std, hc_v_std, magnetisation, bar_l, thin_bar_w, bar_t)
         grid = copy.deepcopy(self.lattice)
         for x in range(0, self.side_len_x):
             for y in range(0, self.side_len_y):
@@ -241,8 +241,8 @@ class ASVI:
         while i <= loops:
             self.previous = copy.deepcopy(self)
             for field in tqdm(self.field_steps, desc='Simulation Loop {} Progress: '.format(i), unit='step'):
+                self.applied_field = field
                 f_exp = field / angleFactor
-                self.applied_field = f_exp
                 Happlied = f_exp * np.array([np.cos(Hrad), np.sin(Hrad), 0.])
                 self.relax(Happlied, n)
                 # applying FMR measurements
@@ -345,9 +345,10 @@ class ASVI:
                 obj.h_local = self.Hlocal(x, y, n=n)
                 unit_vector = obj.unit_vector
                 field = np.dot(np.array(Happlied + obj.h_local), unit_vector)
-                if field < -obj.hc:
+                if np.absolute(field) > obj.hc:
+                    if np.linalg.norm(np.dot(obj.unit_vector, Happlied)) < 0:
+                        obj.flip()
                     obj.set_macrospin()
-                    obj.flip()
         self.lattice = grid
 
     def Hlocal(self, x, y, n=1):
@@ -544,7 +545,7 @@ class ASVI:
                 count += 1
         return count
 
-    def vortex_prob(self, x, y, v_n=2):
+    def vortex_prob(self, x, y, v_n=1):
         x1 = x - v_n
         x2 = x + v_n + 1
         y1 = y - v_n

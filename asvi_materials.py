@@ -3,7 +3,7 @@ import numpy as np
 
 class NanoBar:
     def __init__(self, xpos, ypos, zpos, xmag, ymag, zmag,
-                 hc_m=0.03, hc_v=0.02, hc_std=0.02,
+                 hc_m=0.03, hc_v=0.02, hc_std=0.02, hc_v_std=0.03,
                  bar_l=600e-9, bar_w=150e-9, bar_t=20e-9,
                  magnetisation=800e3, type='macrospin'):
         assert type in ('macrospin', 'vortex')
@@ -13,12 +13,13 @@ class NanoBar:
         self.unit_vector = self.mag / np.linalg.norm(self.mag)
         self.magnetisation = magnetisation
         # Coercive field
-        self.hc_m = hc_m        # macrospin mean coersive field
-        self.hc_v = hc_v        # vortex mean coersive field
-        self.hc_std = hc_std    # percentage standard deviation
+        self.hc_m = hc_m            # macrospin mean coercive field
+        self.hc_v = hc_v            # vortex mean coercive field
+        self.hc_std = hc_std        # percentage standard deviation in macrospin coercive field
+        self.hc_v_std = hc_v_std    # percentage standard deviation in vortex coercive field
         self.hc = np.random.normal(loc=hc_m, scale=hc_std * hc_m, size=None)
         if self.type == 'vortex':
-            self.set_hc(hc_v, hc_std)
+            self.set_hc(hc_v, hc_v_std)
         self.hc_bias = (self.hc - self.hc_m) / self.hc_m
         # Local field
         self.h_local = None
@@ -44,16 +45,16 @@ class NanoBar:
             assert len(mag) == 3, "Input magnetic array should have 3 indices"
             self.set_mag(xmag=mag[0], ymag=mag[1], zmag=mag[2])
 
-    def set_hc(self, hc_u, hc_std, bias=False):
-        if bias:
-            hc = hc_u * (1 + self.hc_bias)
-        else:
-            hc = hc_u
-        hc_new = np.random.normal(loc=hc, scale=hc*hc_std, size=None)
+    def set_hc(self, hc_u, hc_std):
+        hc_new = np.random.normal(loc=hc_u, scale=hc_u*hc_std, size=None)
         # update class properties
         self.hc = hc_new
-        self.hc_m = hc_u
-        self.hc_std = hc_std
+        if self.type == 'macrospin':
+            self.hc_m = hc_u
+            self.hc_std = hc_std
+        elif self.type == 'vortex':
+            self.hc_v = hc_u
+            self.hc_v_std = hc_std
 
     # CLASS METHODS
     def flip(self):
@@ -63,16 +64,16 @@ class NanoBar:
     def set_vortex(self):
         if self.type == 'macrospin':
             self.set_mag(0, 0, 0)
-            self.set_hc(self.hc_v, self.hc_std)
             self.type = 'vortex'
+            self.set_hc(self.hc_v, self.hc_v_std)
         else:
             print('Nonabar already in vortex state')
 
     def set_macrospin(self):
         if self.type == 'vortex':
             self.set_mag(mag = self.unit_vector)
-            self.set_hc(self.hc_m, self.hc_std)
             self.type = 'macrospin'
+            self.set_hc(self.hc_m, self.hc_std)
         else:
             print('Nonabar already in macrospin state')
 
