@@ -162,7 +162,7 @@ def plot_vector_field_2D(asvi, fig, ax, color=None):
     # plotting vector field
     ax.quiver(X, Y, U, V, angles='xy', scale_units='xy', scale=1, pivot='mid', zorder=1,
               linewidths=line_w, color=color, edgecolors=color)
-    ax.scatter(X, Y, s=50, c=Cv, cmap='gist_rainbow', marker='o', zorder=2, vmax=1, vmin=-1)
+    #ax.scatter(X, Y, s=50, c=Cv, cmap='gist_rainbow', marker='o', zorder=2, vmax=1, vmin=-1)
     ax.set_xlabel('Lx (m)')
     ax.set_ylabel('Ly (m)')
     ax.ticklabel_format(style='sci', scilimits=(0, 0))
@@ -225,7 +225,7 @@ def FMR_specturm(data, folder, plotting=False, steps=100, fmin=4.5, fmax=10.5, b
     df_hist = pd.DataFrame(data=FMR_data1, columns=header)
     df_kde = pd.DataFrame(data=FMR_data2, columns=header)
     # Write each dataframe to a different worksheet.
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+    with pd.ExcelWriter(folder, engine='xlsxwriter') as writer:
         df_hist.to_excel(writer, sheet_name='hist')
         df_kde.to_excel(writer, sheet_name=f'kde_bw{bandwidth}')
     print('Output Successful!')
@@ -283,13 +283,13 @@ def FMR_heatmap(type=0, field=0, bias=0, display_FMR_heatmap=False):
 if __name__ == '__main__':
     folder = 'D:\ASI_MSci_Project\ASVI_Simulation_Output'
     FMR_output = 'D:\ASI_MSci_Project\ASVI_Predictions'
-    FMR_file_name = 'sim_all_data.xlsx'
+    FMR_file_name = 'sim_all_data_sin.xlsx'
     output = os.path.join(FMR_output, FMR_file_name)
     vc = load_summary(folder, output='vortex_count')
     mc = load_summary(folder, output='macrospin_count')
     fd = load_summary(folder, output='fieldloops')
     FMR_f = load_summary(folder, output='FMR_frequency')
     # plot_vortex_macrospin_number(vc, mc, 'exp')
-    # plot_applied_field(fd)
-    # FMR_specturm(FMR_f, output, plotting=False, steps=300, fmin=2.0, fmax=10.5, bins=396, bandwidth=0.1)
-    FMR_animation(FMR_file=output, sheet_name='kde_bw0.1', output_folder=folder)
+    plot_applied_field(fd)
+    # FMR_specturm(FMR_f, output, plotting=False, steps=300, fmin=4.0, fmax=10.5, bins=396, bandwidth=0.1)
+    # FMR_animation(FMR_file=output, sheet_name='kde_bw0.1', output_folder=folder)

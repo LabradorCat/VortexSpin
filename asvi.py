@@ -64,18 +64,18 @@ class ASVI:
         assert type(attr) == str
         if grid is None:
             grid = self.lattice
-        len_x = grid.shape[0]
-        len_y = grid.shape[1]
+        len_y = grid.shape[0]
+        len_x = grid.shape[1]
 
         attr_matrix = []
-        for x in range(0, len_x):
+        for y in range(0, len_y):
             attr_matrix.append([])
-            for y in range(0, len_y):
-                obj = grid[x, y]
+            for x in range(0, len_x):
+                obj = grid[y, x]
                 if hasattr(obj, attr):
-                    attr_matrix[x].append(getattr(obj, attr))
+                    attr_matrix[y].append(getattr(obj, attr))
                 else:
-                    attr_matrix[x].append(None)
+                    attr_matrix[y].append(None)
         return np.asarray(attr_matrix, dtype=float)
 
     def pos_matrix(self, grid=None):
@@ -165,15 +165,19 @@ class ASVI:
                 obj = grid[x, y]
                 if x % 4 == 0 and y % 4 == 1:
                     obj.bar_w = thick_bar_w
+                    obj.hc_m = hc_thick
                     obj.set_hc(hc_thick, hc_std)
                 elif x % 4 == 1 and y % 4 == 2:
                     obj.bar_w = thick_bar_w
+                    obj.hc_m = hc_thick
                     obj.set_hc(hc_thick, hc_std)
                 elif x % 4 == 2 and y % 4 == 3:
                     obj.bar_w = thick_bar_w
+                    obj.hc_m = hc_thick
                     obj.set_hc(hc_thick, hc_std)
                 elif x % 4 == 3 and y % 4 == 0:
                     obj.bar_w = thick_bar_w
+                    obj.hc_m = hc_thick
                     obj.set_hc(hc_thick, hc_std)
         self.lattice = grid
 
@@ -253,7 +257,7 @@ class ASVI:
                     else:
                         h_app = FMR_field * np.array([np.cos(Hrad), np.sin(Hrad), 0.])
                         h_app2 = FMR_field
-                    freq = self.FMR_HM(h_app=h_app)
+                    freq = self.measure_FMR(h_app=h_app)
                     frequency.append(np.append([f_exp, h_app2], freq))
                 # saving statistical data
                 q.append(self.correlation(self.previous, self))
@@ -391,10 +395,6 @@ class ASVI:
                     Hl.append(self.fieldCalc(x, y, mag, r0, pos))
             return sum(Hl)
         else:
-            x1 = x - n
-            x2 = x + n + 1
-            y1 = y - n
-            y2 = y + n + 1
             if x1 < 0:
                 x1 = 0
             if x2 > self.side_len_x:
@@ -430,7 +430,7 @@ class ASVI:
             mag = np.array(mag)
             r0 = np.array(r0)
             pos = np.array(pos)
-            mag = self.magnetisation * bar_length * bar_width * bar_thickness * mag
+            mag = magnetisation * bar_length * bar_width * bar_thickness * mag
             # we use np.subtract to allow r0 and pos to be a python lists, not only np.array
             R = np.subtract(np.transpose(r0), pos).T
             # assume that the spatial components of r are the outermost axis
@@ -448,8 +448,8 @@ class ASVI:
             r0 = np.array(r0)
             pos = np.array(pos)
             mag_charge = bar_thickness * magnetisation * bar_width
-            r2 = np.subtract(np.transpose(r0), pos).T + mag * bar_length / 2
-            r1 = np.subtract(np.transpose(r0), pos).T - mag * bar_length / 2
+            r2 = np.subtract(r0, pos) + mag * bar_length / 2
+            r1 = np.subtract(r0, pos) - mag * bar_length / 2
             B = 1e-7 * mag_charge * (r1 / np.linalg.norm(r1) ** 3 - r2 / np.linalg.norm(r2) ** 3)
             return B
 
@@ -486,10 +486,9 @@ class ASVI:
                         charge = net_charge / macro_count
 
                     obj.v_c = charge
-
         self.lattice = grid
 
-    def FMR_HM(self, h_app=None):
+    def measure_FMR(self, h_app=None):
         if h_app is None:
             h_app = [0, 0, 0]
         h_app = np.array([h_app])

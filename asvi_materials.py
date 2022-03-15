@@ -29,41 +29,22 @@ class NanoBar:
         self.bar_t = bar_t
 
     def __repr__(self):
-        return f'NanoBar({self.pos})'
+        return f'{self.type}({self.pos})'
 
     # CLASS GETTER AND SETTER
-    def set_mag(self, xmag=None, ymag=None, zmag=None, mag=None):
-        """
-        Method to set the magnetic dipole of the Nanobar
-        Allow user to set mag altogether, or in each direction separately
-        """
-        if mag is None:
-            if xmag is not None: self.mag[0] = xmag
-            if ymag is not None: self.mag[1] = ymag
-            if ymag is not None: self.mag[2] = zmag
-        else:
-            assert len(mag) == 3, "Input magnetic array should have 3 indices"
-            self.set_mag(xmag=mag[0], ymag=mag[1], zmag=mag[2])
-
     def set_hc(self, hc_u, hc_std):
         hc_new = np.random.normal(loc=hc_u, scale=hc_u*hc_std, size=None)
         # update class properties
         self.hc = hc_new
-        if self.type == 'macrospin':
-            self.hc_m = hc_u
-            self.hc_std = hc_std
-        elif self.type == 'vortex':
-            self.hc_v = hc_u
-            self.hc_v_std = hc_std
 
     # CLASS METHODS
     def flip(self):
-        self.set_mag(mag=np.negative(self.mag))
+        self.mag = np.negative(self.mag)
         self.unit_vector = np.negative(self.unit_vector)
 
     def set_vortex(self):
         if self.type == 'macrospin':
-            self.set_mag(0, 0, 0)
+            self.mag = np.array([0, 0, 0])
             self.type = 'vortex'
             self.set_hc(self.hc_v, self.hc_v_std)
         else:
@@ -71,7 +52,7 @@ class NanoBar:
 
     def set_macrospin(self):
         if self.type == 'vortex':
-            self.set_mag(mag = self.unit_vector)
+            self.mag = self.unit_vector
             self.type = 'macrospin'
             self.set_hc(self.hc_m, self.hc_std)
         else:
@@ -88,5 +69,5 @@ class Vertex:
         self.type = type
 
     def __repr__(self):
-        return f'Vertex({self.pos})'
+        return f'Vertex({self.v_c})'
 
