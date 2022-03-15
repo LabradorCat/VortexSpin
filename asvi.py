@@ -253,12 +253,12 @@ class ASVI:
                 if FMR and (counter % FMR_step) == 0:
                     if FMR_field is None:
                         h_app = Happlied
-                        h_app2 = f_exp
+                        h_app2 = field
                     else:
                         h_app = FMR_field * np.array([np.cos(Hrad), np.sin(Hrad), 0.])
                         h_app2 = FMR_field
                     freq = self.measure_FMR(h_app=h_app)
-                    frequency.append(np.append([f_exp, h_app2], freq))
+                    frequency.append(np.append([field, h_app2], freq))
                 # saving statistical data
                 q.append(self.correlation(self.previous, self))
                 mag.append(self.netMagnetisation())
