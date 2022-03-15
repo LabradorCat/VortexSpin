@@ -5,9 +5,9 @@ from asvi import ASVI
 # -----------------------------------------------------------------------------------------------------------------------
 # Material & Lattice Parameters
 # Define the size of the lattice and material properties
-size = 100               # Dimension of array
-Hc_thin = 0.029             # Coercive Fields (T)
-Hc_thick = 0.01625
+size = 100              # Dimension of array
+Hc_thin = 0.030             # Coercive Fields (T)
+Hc_thick = 0.015
 Hc_vortex = 0.022
 Hc_std = 0.015               # Standard deviation in the coercive field (percentage)
 Hc_v_std = 0.03             # Standard deviation in the vortex coercive field (percentage)
@@ -16,20 +16,20 @@ bar_length = 600e-9         # Bar length in m
 bar_thickness = 20e-9       # Bar thickness in m
 thin_bar_width = 125e-9     # Bar width in m
 thick_bar_width = 200e-9
-magnetisation = 800e3       # Saturation magnetisation of material in A/m (permalloy is 80e3)
+magnetisation = 750e3       # Saturation magnetisation of material in A/m (permalloy is 80e3)
 field_angle = 45.           # Angle at which the field will be applied in degrees
-field_max = 0.0235          # Maximum field to by applied at field angle measured in Telsa
-field_min = 0.0180          # Minimum field to by applied at field angle measured in Telsa
+field_max = 0.0250          # Maximum field to by applied at field angle measured in Telsa
+field_min = 0.0200          # Minimum field to by applied at field angle measured in Telsa
 # -----------------------------------------------------------------------------------------------------------------------
 # Simulation Parameters
-Field = 'Sine_exp'      # Type of Field used to sweep the lattice
+Field = 'Sine_Train'          # Type of Field used to sweep the lattice
 InterType = 'dumbbell'      # Type of interaction (dumbbell or dipole)
-PeriodicBC = False        # Apply periodic boundary condition
-Hsteps = 0               # Number of steps between the minimum value of the coercive field
+PeriodicBC = False          # Apply periodic boundary condition
+Hsteps = 30                  # Number of steps between the minimum value of the coercive field
                             # and the maxium field specified above. Total number of steps in a
                             # minor loop is = (2*steps)
 neighbours = 2              # The radius of neighbouring spins that are included in the local field calculation
-loops = 0                   # The number of minor field loops to be done
+loops = 5                   # The number of minor field loops to be done
 
 # -----------------------------------------------------------------------------------------------------------------------
 # FMR Parameters
@@ -41,7 +41,7 @@ FMR_field = None
 # Running Simulation and output results
 output_folder_name = 'ASVI_Simulation_Output'   # export to 'output_folder_name' in the parent directory
 fps = 10                                        # Animation fps
-animation_size = (10, 10)                        # Animation figure size
+animation_size = (40, 40)                        # Animation figure size
 # Select what to perform in this run
 Simulate = True
 Animate = True
