@@ -124,7 +124,7 @@ class ASVI:
 
     # LATTICE TYPES
     def square(self, hc_m=0.03, hc_v=0.02, hc_std=0.05, hc_v_std=0.03,
-               magnetisation=800e3, bar_l=600e-9, bar_w=125e-9, bar_t=20e-9):
+               magnetisation=800e3, bar_l=600e-9, bar_w=200e-9, bar_t=20e-9):
         '''
         Defines the lattice positions, magnetisation directions and coercive fields of an array of
         square ASI
@@ -154,6 +154,33 @@ class ASVI:
                         grid[x].append(Vertex(xpos, ypos, 0, v_c=0.))
                     else:
                         grid[x].append(Vertex(xpos, ypos, 0, v_c=None))     # pseudo-vertex only serve as place-holders
+        self.lattice = np.asarray(grid, dtype=object)
+
+    def pinwheel(self, hc_m=0.03, hc_v=0.02, hc_std=0.05, hc_v_std=0.03,
+               magnetisation=800e3, bar_l=600e-9, bar_w=200e-9, bar_t=20e-9):
+        '''
+        Defines the lattice positions, magnetisation directions and coercive fields of an array of
+        pinwheel ASI
+        Takes the unit cell from the initial defined parameters
+        Generates a normally distributed range of coercive fields of the bars using Hc_mean and Hc_std as a percentage
+        One thing to potentially change is to have the positions in nanometers
+        '''
+        self.type = 'pinwheel'
+        self.side_len_x = 2 * self.unit_cells_x + 1
+        self.side_len_y = 2 * self.unit_cells_y + 1
+        self.unit_cell_len = (bar_l + self.vertex_gap) / 2
+        grid = []
+        for x in range(0, self.side_len_x):
+            grid.append([])
+            for y in range(0, self.side_len_y):
+                xpos = x * self.unit_cell_len
+                ypos = y * self.unit_cell_len
+                if (x + y) % 2 != 0:
+                    grid[x].append(NanoBar(xpos, ypos, 0, 1, 0, 0, hc_m, hc_v, hc_std, hc_v_std,
+                                            bar_l, bar_w, bar_t, magnetisation, 'macrospin'))
+                else:
+                    grid[x].append(NanoBar(xpos, ypos, 0, 0, 1, 0, hc_m, hc_v, hc_std, hc_v_std,
+                                               bar_l, bar_w, bar_t, magnetisation, 'macrospin'))
         self.lattice = np.asarray(grid, dtype=object)
 
     def square_staircase(self, hc_thin=0.03, hc_thick=0.015, hc_v=0.02, hc_std=0.05, hc_v_std=0.03, magnetisation=800e3,
