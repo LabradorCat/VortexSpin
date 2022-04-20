@@ -1,5 +1,6 @@
 import shutil
 import os
+from pathlib import Path
 from asvi import ASVI
 from plotting import load_summary, FMR_specturm
 # -----------------------------------------------------------------------------------------------------------------------
@@ -46,11 +47,17 @@ bandwidth = 0.1                 # bandwidth for KDE smoothing (Low-pass-filter-l
 
 # -----------------------------------------------------------------------------------------------------------------------
 # Running Simulation and output results
-output_folder_name = 'ASVI_Simulation_Output'   # export folder for simulation data
+output_folder_name = f'ASVI_Simulation_Cache_{Path(__file__).stem}'   # export folder for simulation data
 fps = 10                                        # Animation fps
 animation_size = (40, 40)                       # Animation figure size
-# Select what to perform in this run
+# Select what to perform and measure in simulation
 Simulate = True
+measure_correlation = False
+measure_net_magnetisation = False
+measure_monopole_density = False
+measure_applied_field = True
+measure_vortex_macrospin_count = False
+# produce lattice animation or not
 Animate = True
 
 if __name__ == '__main__':
@@ -67,7 +74,10 @@ if __name__ == '__main__':
     if Simulate:
         shutil.rmtree(folder)
         lattice.fieldSelect(fieldType=Field, steps=Hsteps, Hmax=field_max, Hmin=field_min, Htheta=field_angle)
-        lattice.fieldSweep(n=neighbours, loops=loops, folder=folder, FMR=FMR, FMR_step=FMR_step, FMR_field=FMR_field)
+        lattice.fieldSweep(n=neighbours, loops=loops, folder=folder, FMR=FMR, FMR_step=FMR_step, FMR_field=FMR_field,
+                           correlation=measure_correlation, net_mag=measure_net_magnetisation,
+                           monopole_density=measure_monopole_density, fieldloop=measure_applied_field,
+                           count=measure_vortex_macrospin_count)
         if FMR:
             if not os.path.exists(FMR_folder):
                 os.mkdir(FMR_folder)

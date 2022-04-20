@@ -241,7 +241,9 @@ class ASVI:
         self.field_angle = Htheta
         self.steps = len(self.field_steps)
 
-    def fieldSweep(self, n=1, loops=1, folder=None, FMR=False, FMR_step=2, FMR_field=None):
+    def fieldSweep(self, n=1, loops=1, folder=None, FMR=False, FMR_step=2, FMR_field=None,
+                   correlation=False, net_mag=False, monopole_density=False, fieldloop=False,
+                   count=False):
         """
         Sweeps through the lattice using the designated field type.
         Total number of steps for a full minor loop is (2 * step).
@@ -251,8 +253,6 @@ class ASVI:
         The Lattice after each field step gets saved to a folder. if folder is None then the
         function saves the lattice to the current working directory
         """
-        # Determine which field type to sweep the lattice
-
         # Working out field angle and amend field steps
         Hrad = np.deg2rad(self.field_angle)
         Hmax, steps, Htheta = self.Hmax, self.steps, self.field_angle
@@ -287,12 +287,18 @@ class ASVI:
                     freq = self.measure_FMR(h_app=h_app)
                     frequency.append(np.append([field, h_app2], freq))
                 # saving statistical data
-                q.append(self.correlation(self.previous, self))
-                mag.append(self.netMagnetisation())
-                monopole.append(self.monopoleDensity())
-                fieldloops.append(field)
-                vortex_count.append(self.count_vortex())
-                macrospin_count.append(self.count_macrospin())
+                if correlation:
+                    q.append(self.correlation(self.previous, self))
+                if net_mag:
+                    mag.append(self.netMagnetisation())
+                if monopole_density:
+                    monopole.append(self.monopoleDensity())
+                if fieldloop:
+                    fieldloops.append(field)
+                if count:
+                    vortex_count.append(self.count_vortex())
+                    macrospin_count.append(self.count_macrospin())
+                # save simulation results into .npz file
                 self.save('ASVIcounter{}_Loop{}_FieldApplied{:.3f}_Angle{:.0f}'.format(
                     counter, i, field, Htheta), folder=folder)
                 counter += 1
