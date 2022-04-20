@@ -277,7 +277,7 @@ class ASVI:
                 Happlied = f_exp * np.array([np.cos(Hrad), np.sin(Hrad), 0.])
                 self.relax(Happlied, n)
                 # applying FMR measurements
-                if FMR and (counter % FMR_step) == 0:
+                if FMR and ((counter % FMR_step) == 0):
                     if FMR_field is None:
                         h_app = Happlied
                         h_app2 = field
