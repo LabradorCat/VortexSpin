@@ -2,11 +2,11 @@ import shutil
 import os
 from pathlib import Path
 from asvi import ASVI
-from plotting import load_summary, FMR_specturm
+from plotting import load_summary, FMR_specturm, plot_FMR_spectrum
 # -----------------------------------------------------------------------------------------------------------------------
 # Material & Lattice Parameters
 # Define the size of the lattice and material properties
-size = 100              # Dimension of array
+size = 10              # Dimension of array
 Hc_thin = 0.030             # Coercive Fields (T)
 Hc_thick = 0.015
 Hc_vortex = 0.022
@@ -26,11 +26,11 @@ field_min = 0.0200          # Minimum field to by applied at field angle measure
 Field = 'Sine_Train'          # Type of Field used to sweep the lattice
 InterType = 'dumbbell'      # Type of interaction (dumbbell or dipole)
 PeriodicBC = False          # Apply periodic boundary condition
-Hsteps = 30                  # Number of steps between the minimum value of the coercive field
+Hsteps = 15                  # Number of steps between the minimum value of the coercive field
                             # and the maxium field specified above. Total number of steps in a
                             # minor loop is = (2*steps)
 neighbours = 2              # The radius of neighbouring spins that are included in the local field calculation
-loops = 20                   # The number of minor field loops to be done
+loops = 0                   # The number of minor field loops to be done
 
 # -----------------------------------------------------------------------------------------------------------------------
 # FMR Parameters
@@ -51,16 +51,17 @@ output_folder_name = f'ASVI_Simulation_Cache_{Path(__file__).stem}'   # export f
 fps = 10                                        # Animation fps
 animation_size = (40, 40)                       # Animation figure size
 # Select what to perform and measure in simulation
-Simulate = True
+Simulate = False
 measure_correlation = False
 measure_net_magnetisation = False
 measure_monopole_density = False
 measure_applied_field = True
 measure_vortex_macrospin_count = False
 # produce lattice animation or not
-Animate = True
+Animate = False
 
-if __name__ == '__main__':
+#if __name__ == '__main__':
+if True:
     folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir, output_folder_name))
     FMR_folder = os.path.abspath(os.path.join(os.getcwd(), os.pardir, FMR_folder_name))
     # Generate ASVI Class model
@@ -78,13 +79,16 @@ if __name__ == '__main__':
                            correlation=measure_correlation, net_mag=measure_net_magnetisation,
                            monopole_density=measure_monopole_density, fieldloop=measure_applied_field,
                            count=measure_vortex_macrospin_count)
-        if FMR:
-            if not os.path.exists(FMR_folder):
-                os.mkdir(FMR_folder)
-            # produce FMR data sheet
-            FMR_output_path = os.path.join(FMR_folder, FMR_file_name)
-            FMR_f = load_summary(folder, output='FMR_frequency')
-            FMR_specturm(FMR_f, FMR_output_path, fmin=freq_min, fmax=freq_min, bins=IQ_bins, bandwidth=bandwidth)
+
+    if FMR:
+        if not os.path.exists(FMR_folder):
+            os.mkdir(FMR_folder)
+        # produce FMR data sheet
+        FMR_output_path = os.path.join(FMR_folder, FMR_file_name)
+        print(FMR_output_path)
+        FMR_f = load_summary(folder, output='FMR_frequency')
+        FMR_specturm(FMR_f, FMR_output_path, fmin=freq_min, fmax=freq_min, bins=IQ_bins, bandwidth=bandwidth)
+        plot_FMR_spectrum(FMR_output_path)
 
     if Animate:
         lattice.fieldSweepAnimation(folder, figsize=animation_size, fps=fps)
