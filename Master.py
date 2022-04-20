@@ -85,10 +85,8 @@ if True:
             os.mkdir(FMR_folder)
         # produce FMR data sheet
         FMR_output_path = os.path.join(FMR_folder, FMR_file_name)
-        print(FMR_output_path)
         FMR_f = load_summary(folder, output='FMR_frequency')
-        FMR_specturm(FMR_f, FMR_output_path, fmin=freq_min, fmax=freq_min, bins=IQ_bins, bandwidth=bandwidth)
-        plot_FMR_spectrum(FMR_output_path)
+        FMR_specturm(FMR_f, FMR_output_path, fmin=freq_min, fmax=freq_max, bins=IQ_bins, bandwidth=bandwidth)
 
     if Animate:
         lattice.fieldSweepAnimation(folder, figsize=animation_size, fps=fps)
